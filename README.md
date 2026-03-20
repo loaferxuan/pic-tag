@@ -49,12 +49,17 @@ npm test -- --runInBand
 ## 发布
 
 ```bash
-# Android 内部分发 APK
-npx eas build --platform android --profile production
+# Android 内部分发 APK（arm64 默认包）
+npx eas build --platform android --profile release-apk-arm64
+
+# Android 内部分发 APK（armv7 旧设备）
+npx eas build --platform android --profile release-apk-armv7
 
 # Android 商店包 AAB
 npx eas build --platform android --profile store
 ```
+
+Android 发布 profile 说明见：[ANDROID_RELEASES.md](./ANDROID_RELEASES.md)
 
 ## 备份格式
 
