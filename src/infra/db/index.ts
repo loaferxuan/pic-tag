@@ -4,12 +4,14 @@ export { PhotoRepository } from './repositories/photo.repository';
 export { TagRepository, TagCategoryRepository } from './repositories/tag.repository';
 export { StatsRepository } from './repositories/stats.repository';
 export { SettingsRepository } from './repositories/settings.repository';
+export { TagPresetRepository } from './repositories/tag-preset.repository';
 
 import { getDb } from './client';
 import { PhotoRepository } from './repositories/photo.repository';
 import { TagRepository, TagCategoryRepository } from './repositories/tag.repository';
 import { StatsRepository } from './repositories/stats.repository';
 import { SettingsRepository } from './repositories/settings.repository';
+import { TagPresetRepository } from './repositories/tag-preset.repository';
 
 export async function getRepositories() {
   const db = await getDb();
@@ -19,5 +21,6 @@ export async function getRepositories() {
     tagCategory: new TagCategoryRepository(db),
     stats: new StatsRepository(db),
     settings: new SettingsRepository(db),
+    tagPreset: new TagPresetRepository(db),
   };
 }

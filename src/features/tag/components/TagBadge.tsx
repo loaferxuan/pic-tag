@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import type { Tag } from '@/shared/types/domain';
 import { getContrastTextColor, hexToRgba, normalizeHexColor } from '@/shared/utils/color';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import Colors from '@/shared/theme/Colors';
+import { BorderRadius } from '@/shared/theme/Theme';
 
 interface TagBadgeProps {
   tag: Tag;
@@ -13,10 +14,8 @@ interface TagBadgeProps {
   disabled?: boolean;
 }
 
-const DEFAULT_UNSELECTED_BG_ALPHA = 0.12;
-const DEFAULT_UNSELECTED_BORDER_ALPHA = 0.2;
-const LIGHT_UNSELECTED_BG_ALPHA = 0.15;
-const LIGHT_BORDER_COLOR = 'rgba(15,23,42,0.15)';
+const UNSELECTED_BG_ALPHA = 0.1;
+const UNSELECTED_BORDER_ALPHA = 0.25;
 
 export function TagBadge({
   tag,
@@ -32,40 +31,43 @@ export function TagBadge({
   const contrastTextColor = getContrastTextColor(color);
   const isLightColor = contrastTextColor === '#111827';
 
-  let backgroundColor = selected ? color : hexToRgba(color, DEFAULT_UNSELECTED_BG_ALPHA);
-  let borderColor = selected ? themeColors.text : hexToRgba(color, DEFAULT_UNSELECTED_BORDER_ALPHA);
+  let backgroundColor = selected ? color : hexToRgba(color, UNSELECTED_BG_ALPHA);
+  let borderColor = selected ? color : hexToRgba(color, UNSELECTED_BORDER_ALPHA);
   let textColor = selected ? contrastTextColor : color;
 
-  if (isLightColor) {
-    if (selected) {
-      textColor = '#111827';
-    } else {
-      backgroundColor = hexToRgba(color, LIGHT_UNSELECTED_BG_ALPHA);
-      borderColor = LIGHT_BORDER_COLOR;
-      textColor = '#1f2937';
-    }
+  if (isLightColor && !selected) {
+    backgroundColor = hexToRgba(color, 0.12);
+    borderColor = hexToRgba(color, 0.3);
+    textColor = '#374151';
   }
+
+  const isSmall = size === 'small';
+  const paddingVertical = isSmall ? 4 : 6;
+  const paddingHorizontal = isSmall ? 10 : 14;
+  const fontSize = isSmall ? 12 : 13;
+  const borderRadiusValue = isSmall ? BorderRadius.md : BorderRadius.lg;
 
   const content = (
     <View
       style={[
         styles.badge,
-        size === 'small' && styles.small,
         {
           backgroundColor,
           borderColor,
-          borderWidth: selected ? 2 : 1,
-          opacity: disabled ? 0.45 : 1,
+          paddingVertical,
+          paddingHorizontal,
+          borderRadius: borderRadiusValue,
+          opacity: disabled ? 0.5 : 1,
         },
       ]}
     >
       <Text
         style={[
           styles.text,
-          size === 'small' && styles.textSmall,
           {
             color: textColor,
-            fontWeight: selected ? '700' : '600',
+            fontSize,
+            fontWeight: selected ? '600' : '500',
           },
         ]}
         numberOfLines={1}
@@ -74,37 +76,29 @@ export function TagBadge({
       </Text>
     </View>
   );
+
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={disabled ? 1 : 0.7} disabled={disabled}>
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+      >
         {content}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
+
   return content;
 }
 
 const styles = StyleSheet.create({
   badge: {
     borderWidth: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
     maxWidth: 160,
   },
-  small: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
   text: {
-    fontSize: 14,
     letterSpacing: 0.2,
-  },
-  textSmall: {
-    fontSize: 12,
-    letterSpacing: 0.1,
   },
 });

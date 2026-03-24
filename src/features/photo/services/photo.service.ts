@@ -385,7 +385,6 @@ export async function createPhotoRecordForBackfill(options: BackfillPhotoCreateO
     enqueueFingerprint(row.id);
   }
 
-
   const fresh = await repos.photo.findById(row.id);
   return rowToPhoto(fresh ?? row);
 }

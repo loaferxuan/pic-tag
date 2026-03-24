@@ -1,0 +1,14 @@
+Resolved "preview" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "preview" environment on EAS.
+Environment variables loaded from the "release-apk-arm64" build profile "env" configuration: APP_VARIANT, ANDROID_BUILD_ARCHS.
+
+
+
+android.versionCode field in app config is ignored when version source is set to remote, but this value will still be in the manifest available via expo-constants. It's recommended to remove this value from app config.
+✔ Using remote Android credentials (Expo server)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+
+See logs: https://expo.dev/accounts/shengong/projects/pic-tag/builds/fda13451-ce80-4e03-a4db-2efcb106b994
+
+Waiting for build to complete. You can press Ctrl+C to exit.

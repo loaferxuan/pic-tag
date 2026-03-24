@@ -1,15 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { Alert, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, FlatList, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTagsWithCategories } from '@/features/tag/hooks/useTags';
 import { useTagStore } from '@/features/tag/store/tag.store';
 import { TagCategorySection } from '@/features/tag/components/TagCategorySection';
 import { TagBadge } from '@/features/tag/components/TagBadge';
 import { TagColorEditor, isColorDraftValid } from '@/features/tag/components/TagColorEditor';
+import { PresetManager } from '@/features/tag/components/PresetManager';
 import { Button } from '@/shared/ui/Button';
 import type { Tag, TagCategory } from '@/shared/types/domain';
-import { normalizeHexColor } from '@/shared/utils/color';
-import { getSanitizedDefaultTagIds, saveDefaultTagIds } from '@/features/tag/services/default-tag.service';
+import { normalizeHexColor, hexToRgba } from '@/shared/utils/color';
+import * as presetService from '@/features/tag/services/tag-preset.service';
+import { getRepositories } from '@/infra/db';
+import { syncDefaultTagIdsFromPreset } from '@/features/tag/services/default-tag.service';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import Colors from '@/shared/theme/Colors';
+import { BorderRadius, Spacing, FontSize } from '@/shared/theme/Theme';
 
 const DEFAULT_COLOR = '#808080';
 const UNCATEGORIZED_CATEGORY: TagCategory = {
@@ -23,6 +29,9 @@ const UNCATEGORIZED_CATEGORY: TagCategory = {
 
 export default function TagManageScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const themeColors = Colors[colorScheme];
+
   const { tags, categories, tagsByCategory, loading, error, reload } = useTagsWithCategories();
   const createCategory = useTagStore((s) => s.createCategory);
   const updateCategory = useTagStore((s) => s.updateCategory);
@@ -38,35 +47,446 @@ export default function TagManageScreen() {
   const [editingCategoryColor, setEditingCategoryColor] = useState(DEFAULT_COLOR);
   const [savingCategory, setSavingCategory] = useState(false);
 
-  const [defaultTagIds, setDefaultTagIds] = useState<number[]>([]);
-  const [loadingDefaultTags, setLoadingDefaultTags] = useState(false);
-  const [savingDefaultTags, setSavingDefaultTags] = useState(false);
+  const [presets, setPresets] = useState<presetService.TagPresetDisplay[]>([]);
+  const [loadingPresets, setLoadingPresets] = useState(false);
+  const [showPresetManager, setShowPresetManager] = useState(false);
+  const [showPresetSelector, setShowPresetSelector] = useState(false);
+  const [existingPresetTags, setExistingPresetTags] = useState<Map<number, Array<{ itemId: number; tagId: number; name: string; color: string }>>>(new Map());
 
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags]);
-  const defaultSelectedTags = useMemo(
-    () => defaultTagIds.map((tagId) => tagMap.get(tagId)).filter(Boolean) as Tag[],
-    [defaultTagIds, tagMap]
-  );
   const canCreateCategory = categoryName.trim().length > 0 && isColorDraftValid(categoryColor);
   const canSaveCategory = editingCategoryName.trim().length > 0 && isColorDraftValid(editingCategoryColor);
   const uncategorizedCount = tagsByCategory.get(-1)?.length ?? 0;
 
-  useEffect(() => {
-    let mounted = true;
-    const loadDefaultTags = async () => {
-      setLoadingDefaultTags(true);
-      try {
-        const sanitized = await getSanitizedDefaultTagIds();
-        if (mounted) setDefaultTagIds(sanitized);
-      } finally {
-        if (mounted) setLoadingDefaultTags(false);
+  const activePresets = useMemo(() => presets.filter((p) => p.isActive), [presets]);
+
+  const loadPresets = useCallback(async () => {
+    setLoadingPresets(true);
+    try {
+      const data = await presetService.getAllPresets();
+      setPresets(data);
+
+      const repos = await getRepositories();
+      const tagMapLocal = new Map<number, Array<{ itemId: number; tagId: number; name: string; color: string }>>();
+
+      for (const preset of data) {
+        const items = await repos.tagPreset.getItemsByPresetId(preset.id);
+        const tagItems: Array<{ itemId: number; tagId: number; name: string; color: string }> = [];
+
+        for (const item of items) {
+          if (item.tag_id !== null) {
+            const tag = tagMap.get(item.tag_id);
+            if (tag) {
+              tagItems.push({
+                itemId: item.id,
+                tagId: item.tag_id,
+                name: tag.name,
+                color: tag.color,
+              });
+            }
+          }
+        }
+
+        tagMapLocal.set(preset.id, tagItems);
       }
-    };
-    void loadDefaultTags();
-    return () => {
-      mounted = false;
-    };
-  }, [tags]);
+
+      setExistingPresetTags(tagMapLocal);
+    } finally {
+      setLoadingPresets(false);
+    }
+  }, [tagMap]);
+
+  useEffect(() => {
+    void loadPresets();
+  }, [loadPresets]);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+    },
+    content: {
+      padding: Spacing.lg,
+      paddingBottom: 40,
+    },
+    card: {
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginBottom: Spacing.lg,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    cardTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: '600',
+      marginBottom: Spacing.xs,
+      color: themeColors.text,
+    },
+    cardAction: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+      color: themeColors.tint,
+    },
+    hintText: {
+      fontSize: FontSize.sm,
+      marginBottom: Spacing.md,
+      lineHeight: 20,
+      color: themeColors.textSecondary,
+    },
+    muted: {
+      fontSize: FontSize.sm,
+      marginBottom: Spacing.md,
+      color: themeColors.textSecondary,
+    },
+    error: {
+      fontSize: FontSize.sm,
+      marginBottom: Spacing.md,
+      color: themeColors.error,
+    },
+    selectedTagRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.sm,
+      marginBottom: Spacing.md,
+    },
+    editorActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: Spacing.sm,
+    },
+    flexButton: {
+      flex: 1,
+    },
+    gap: {
+      width: Spacing.md,
+    },
+    presetRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.md,
+      marginTop: Spacing.sm,
+    },
+    presetChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.full,
+      borderWidth: 1,
+      gap: Spacing.sm,
+    },
+    presetChipText: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+    },
+    presetChipMeta: {
+      fontSize: FontSize.xs,
+    },
+    sectionTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: '600',
+      marginTop: Spacing.lg,
+      marginBottom: Spacing.md,
+      color: themeColors.text,
+    },
+    input: {
+      height: 48,
+      borderRadius: BorderRadius.md,
+      paddingHorizontal: Spacing.md,
+      fontSize: FontSize.md,
+      borderWidth: 1,
+      marginBottom: Spacing.md,
+      backgroundColor: themeColors.surfaceHighlight,
+      color: themeColors.text,
+      borderColor: themeColors.border,
+    },
+    entryBlock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+    },
+    manageBlock: {
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+    },
+    manageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    rowMain: {
+      flex: 1,
+    },
+    rowTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    rowColorDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: Spacing.sm,
+    },
+    rowTitle: {
+      fontSize: FontSize.md,
+      fontWeight: '500',
+      color: themeColors.text,
+    },
+    rowMeta: {
+      fontSize: FontSize.xs,
+      marginLeft: 18,
+      color: themeColors.textSecondary,
+    },
+    actionText: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+      color: themeColors.tint,
+    },
+    actionLink: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+      marginLeft: Spacing.lg,
+      color: themeColors.tint,
+    },
+    rowActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    editorWrap: {
+      marginTop: Spacing.md,
+      paddingTop: Spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: themeColors.border,
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: themeColors.background,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.lg,
+      paddingVertical: Spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: themeColors.border,
+    },
+    modalClose: {
+      fontSize: FontSize.md,
+      fontWeight: '500',
+      color: themeColors.tint,
+    },
+    modalTitle: {
+      fontSize: FontSize.lg,
+      fontWeight: '600',
+      color: themeColors.text,
+    },
+    presetList: {
+      padding: Spacing.lg,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 48,
+    },
+    emptyText: {
+      fontSize: FontSize.md,
+      fontWeight: '600',
+      marginBottom: Spacing.xs,
+      color: themeColors.textSecondary,
+    },
+    emptyHint: {
+      fontSize: FontSize.sm,
+      color: themeColors.textTertiary,
+    },
+    defaultPresetCard: {
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1.5,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+      backgroundColor: hexToRgba(themeColors.tint, 0.08),
+      borderColor: themeColors.tint,
+    },
+    defaultPresetHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.sm,
+    },
+    defaultPresetBadge: {
+      backgroundColor: hexToRgba(themeColors.tint, 0.1),
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.sm,
+      marginRight: Spacing.sm,
+    },
+    defaultPresetBadgeText: {
+      fontSize: FontSize.xs,
+      fontWeight: '600',
+      color: themeColors.tint,
+    },
+    defaultPresetName: {
+      fontSize: FontSize.lg,
+      fontWeight: '600',
+      flex: 1,
+      color: themeColors.text,
+    },
+    defaultPresetCount: {
+      fontSize: FontSize.sm,
+      color: themeColors.textSecondary,
+    },
+    defaultPresetTags: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.xs,
+      marginBottom: Spacing.md,
+    },
+    defaultPresetMore: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+      alignSelf: 'center',
+      color: themeColors.textTertiary,
+    },
+    removeDefaultBtn: {
+      alignSelf: 'flex-start',
+      paddingVertical: Spacing.xs,
+      paddingHorizontal: Spacing.md,
+      borderRadius: BorderRadius.md,
+      borderWidth: 1,
+      borderColor: themeColors.border,
+    },
+    removeDefaultText: {
+      fontSize: FontSize.sm,
+      color: themeColors.textSecondary,
+    },
+    noDefaultCard: {
+      backgroundColor: themeColors.surfaceHighlight,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+      alignItems: 'center',
+    },
+    noDefaultText: {
+      fontSize: FontSize.md,
+      marginBottom: Spacing.xs,
+      color: themeColors.textSecondary,
+    },
+    noDefaultHint: {
+      fontSize: FontSize.sm,
+      color: themeColors.textTertiary,
+    },
+    presetQuickActions: {
+      marginTop: Spacing.md,
+    },
+    presetQuickActionsTitle: {
+      fontSize: FontSize.sm,
+      marginBottom: Spacing.sm,
+      color: themeColors.textSecondary,
+    },
+    presetQuickRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: Spacing.sm,
+    },
+    presetQuickChip: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.md,
+      borderWidth: 1,
+    },
+    presetQuickChipText: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+    },
+    viewAllText: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+      textAlign: 'center',
+      marginTop: Spacing.md,
+      color: themeColors.tint,
+    },
+    presetItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginBottom: Spacing.md,
+    },
+    presetIndicator: {
+      width: 4,
+      height: 40,
+      borderRadius: 2,
+      marginRight: Spacing.md,
+    },
+    presetItemInfo: {
+      flex: 1,
+    },
+    presetItemName: {
+      fontSize: FontSize.md,
+      fontWeight: '600',
+      color: themeColors.text,
+    },
+    presetItemDesc: {
+      fontSize: FontSize.sm,
+      marginTop: 2,
+      color: themeColors.textSecondary,
+    },
+    presetItemMeta: {
+      fontSize: FontSize.xs,
+      marginTop: Spacing.xs,
+      color: themeColors.textTertiary,
+    },
+    presetApplyBtn: {
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.md,
+      marginLeft: Spacing.md,
+    },
+    presetApplyText: {
+      fontSize: FontSize.sm,
+      fontWeight: '500',
+    },
+    emptyCategoryCard: {
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderWidth: 1,
+      borderRadius: BorderRadius.lg,
+      padding: Spacing.xl,
+      alignItems: 'center',
+    },
+    uncategorizedBlock: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: themeColors.card,
+      borderColor: themeColors.border,
+      borderRadius: BorderRadius.lg,
+      borderWidth: 1,
+      padding: Spacing.lg,
+      marginTop: Spacing.md,
+    },
+  }), [themeColors]);
 
   const openCategoryTagManager = (categoryId: number | null) => {
     if (categoryId === null) {
@@ -76,27 +496,43 @@ export default function TagManageScreen() {
     router.push(`/tag/manage/${categoryId}` as never);
   };
 
-  const toggleDefaultTag = (tagId: number) => {
-    setDefaultTagIds((prev) => (prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]));
+  const handleCreatePreset = async (name: string, description: string, color: string) => {
+    await presetService.createPreset({ name, description, color });
   };
 
-  const handleSaveDefaultTags = async () => {
-    setSavingDefaultTags(true);
-    try {
-      const saved = await saveDefaultTagIds(defaultTagIds);
-      setDefaultTagIds(saved);
-    } finally {
-      setSavingDefaultTags(false);
+  const handleUpdatePreset = async (id: number, data: { name?: string; description?: string | null; color?: string; isActive?: boolean }) => {
+    await presetService.updatePreset(id, data);
+  };
+
+  const handleDeletePreset = async (id: number) => {
+    const defaultPreset = await presetService.getDefaultPreset();
+    await presetService.deletePreset(id);
+    if (defaultPreset && defaultPreset.id === id) {
+      await syncDefaultTagIdsFromPreset();
     }
   };
 
-  const handleClearDefaultTags = async () => {
-    setSavingDefaultTags(true);
-    try {
-      await saveDefaultTagIds([]);
-      setDefaultTagIds([]);
-    } finally {
-      setSavingDefaultTags(false);
+  const handleDuplicatePreset = async (id: number, newName: string) => {
+    await presetService.duplicatePreset(id, newName);
+  };
+
+  const handleAddTagToPreset = async (presetId: number, tagId: number) => {
+    await presetService.addExistingTagToPreset(presetId, tagId);
+    const defaultPreset = await presetService.getDefaultPreset();
+    if (defaultPreset && defaultPreset.id === presetId) {
+      await syncDefaultTagIdsFromPreset();
+    }
+  };
+
+  const handleRemoveTagFromPreset = async (itemId: number) => {
+    const repos = await getRepositories();
+    const item = await repos.tagPreset.getItemById(itemId);
+    await presetService.removeItemFromPreset(itemId);
+    if (item) {
+      const defaultPreset = await presetService.getDefaultPreset();
+      if (defaultPreset && defaultPreset.id === item.preset_id) {
+        await syncDefaultTagIdsFromPreset();
+      }
     }
   };
 
@@ -164,12 +600,12 @@ export default function TagManageScreen() {
     if (deletingCategoryId === id) return;
 
     Alert.alert(
-      '\u5220\u9664\u5206\u7c7b',
-      '\u5220\u9664\u540e\u5206\u7c7b\u672c\u8eab\u4f1a\u88ab\u79fb\u9664\uff0c\u4f46\u8be5\u5206\u7c7b\u4e0b\u7684\u6807\u7b7e\u4e0d\u4f1a\u88ab\u5220\u9664\uff0c\u800c\u662f\u8f6c\u4e3a\u201c\u672a\u5206\u7c7b\u201d\u3002\u662f\u5426\u7ee7\u7eed\uff1f',
+      '删除分类',
+      '删除后分类本身会被移除，但该分类下的标签不会被删除，而是转为"未分类"。是否继续？',
       [
-        { text: '\u53d6\u6d88', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
-          text: '\u5220\u9664',
+          text: '删除',
           style: 'destructive',
           onPress: () => {
             void handleDeleteCategory(id);
@@ -179,150 +615,188 @@ export default function TagManageScreen() {
     );
   };
 
+  const availableTagsForPreset = useMemo(() => {
+    return tags.map((tag) => ({ id: tag.id, name: tag.name, color: tag.color }));
+  }, [tags]);
+
+  const defaultPreset = useMemo(() => presets.find((p) => p.isDefault) ?? null, [presets]);
+  const defaultPresetTagIds = useMemo(() => {
+    if (!defaultPreset) return [];
+    const items = existingPresetTags.get(defaultPreset.id);
+    return items?.map((item) => item.tagId) ?? [];
+  }, [defaultPreset, existingPresetTags]);
+  const defaultPresetTags = useMemo(
+    () => defaultPresetTagIds.map((tagId) => tagMap.get(tagId)).filter(Boolean) as Tag[],
+    [defaultPresetTagIds, tagMap]
+  );
+
+  const handleSetAsDefault = async (presetId: number) => {
+    try {
+      await presetService.setDefaultPreset(presetId);
+      await loadPresets();
+      Alert.alert('设置成功', '已将该预设设为默认标签');
+    } catch {
+      Alert.alert('设置失败', '无法设置默认预设');
+    }
+  };
+
+  const handleRemoveDefault = async () => {
+    if (!defaultPreset) return;
+    try {
+      await presetService.removeDefaultPreset(defaultPreset.id);
+      await loadPresets();
+      Alert.alert('已取消', '默认预设已取消');
+    } catch {
+      Alert.alert('操作失败', '无法取消默认预设');
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <ScrollView style={[styles.container, { backgroundColor: themeColors.background }]} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {error ? <Text style={[styles.error, { color: themeColors.error }]}>{error}</Text> : null}
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>默认标签</Text>
-        <Text style={styles.hintText}>
-          仅对新导入照片生效：首次进入照片详情且当前无标签时，按当时最新默认标签配置自动补打一轮。
+      <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cardTitle, { color: themeColors.text }]}>标签预设</Text>
+          <TouchableOpacity onPress={() => setShowPresetManager(true)}>
+            <Text style={[styles.cardAction, { color: themeColors.tint }]}>管理预设</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.hintText, { color: themeColors.textSecondary }]}>
+          预设是一组标签的组合。设定默认预设后，新导入照片将自动应用该预设中的标签。
         </Text>
-        <Text style={styles.hintText}>若后续手动清空照片标签，不会再次自动补打。</Text>
 
-        {loadingDefaultTags ? <Text style={styles.muted}>默认标签加载中...</Text> : null}
-
-        {!loadingDefaultTags && defaultSelectedTags.length === 0 ? (
-          <Text style={styles.muted}>当前未设置默认标签。</Text>
+        {loadingPresets ? (
+          <Text style={[styles.muted, { color: themeColors.textTertiary }]}>加载中...</Text>
         ) : null}
 
-        {defaultSelectedTags.length > 0 ? (
-          <View style={styles.selectedTagRow}>
-            {defaultSelectedTags.map((tag) => (
-              <TagBadge key={`default-selected-${tag.id}`} tag={tag} selected size="small" />
-            ))}
+        {!loadingPresets && presets.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>暂无预设</Text>
+            <Text style={[styles.emptyHint, { color: themeColors.textTertiary }]}>点击"管理预设"创建第一个预设</Text>
           </View>
         ) : null}
 
-        {tags.length === 0 ? (
-          <Text style={styles.muted}>暂无可选标签，请先创建分类并进入分类创建标签。</Text>
+        {defaultPreset ? (
+          <View style={[styles.defaultPresetCard, { backgroundColor: hexToRgba(defaultPreset.color, 0.08), borderColor: defaultPreset.color }]}>
+            <View style={styles.defaultPresetHeader}>
+              <View style={styles.defaultPresetBadge}>
+                <Text style={[styles.defaultPresetBadgeText, { color: defaultPreset.color }]}>默认</Text>
+              </View>
+              <Text style={[styles.defaultPresetName, { color: themeColors.text }]}>{defaultPreset.name}</Text>
+              <Text style={[styles.defaultPresetCount, { color: themeColors.textSecondary }]}>
+                {defaultPresetTagIds.length} 个标签
+              </Text>
+            </View>
+            {defaultPresetTags.length > 0 && (
+              <View style={styles.defaultPresetTags}>
+                {defaultPresetTags.slice(0, 5).map((tag) => (
+                  <TagBadge key={`default-tag-${tag.id}`} tag={tag} size="small" />
+                ))}
+                {defaultPresetTags.length > 5 && (
+                  <Text style={[styles.defaultPresetMore, { color: themeColors.textTertiary }]}>
+                    +{defaultPresetTags.length - 5}
+                  </Text>
+                )}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.removeDefaultBtn, { borderColor: themeColors.border }]}
+              onPress={handleRemoveDefault}
+            >
+              <Text style={[styles.removeDefaultText, { color: themeColors.textSecondary }]}>取消默认</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          <>
-            {categories.map((cat) => (
-              <TagCategorySection
-                key={`default-category-${cat.id}`}
-                category={cat}
-                tags={(tagsByCategory.get(cat.id) ?? []) as Tag[]}
-                selectedTagIds={defaultTagIds}
-                onTagPress={toggleDefaultTag}
-              />
-            ))}
-
-            {uncategorizedCount > 0 ? (
-              <TagCategorySection
-                category={UNCATEGORIZED_CATEGORY}
-                tags={(tagsByCategory.get(-1) ?? []) as Tag[]}
-                selectedTagIds={defaultTagIds}
-                onTagPress={toggleDefaultTag}
-              />
-            ) : null}
-          </>
+          !loadingPresets && presets.length > 0 && (
+            <View style={[styles.noDefaultCard, { backgroundColor: themeColors.surfaceHighlight, borderColor: themeColors.border }]}>
+              <Text style={[styles.noDefaultText, { color: themeColors.textSecondary }]}>当前未设置默认预设</Text>
+              <Text style={[styles.noDefaultHint, { color: themeColors.textTertiary }]}>选择一个预设设为默认</Text>
+            </View>
+          )
         )}
 
-        <View style={styles.editorActions}>
-          <Button title="保存默认标签" onPress={handleSaveDefaultTags} loading={savingDefaultTags} style={styles.flexButton} />
-          <View style={styles.gap} />
-          <Button
-            title="清空默认标签"
-            onPress={handleClearDefaultTags}
-            variant="outline"
-            style={styles.flexButton}
-            disabled={savingDefaultTags || defaultTagIds.length === 0}
-          />
-        </View>
+        {!loadingPresets && activePresets.length > 0 && (
+          <View style={styles.presetQuickActions}>
+            <Text style={[styles.presetQuickActionsTitle, { color: themeColors.textSecondary }]}>快速设为默认</Text>
+            <View style={styles.presetQuickRow}>
+              {activePresets.slice(0, 4).map((preset) => (
+                <TouchableOpacity
+                  key={`quick-${preset.id}`}
+                  style={[
+                    styles.presetQuickChip,
+                    { backgroundColor: hexToRgba(preset.color, 0.12), borderColor: preset.color },
+                    preset.isDefault && { borderWidth: 2 },
+                  ]}
+                  onPress={() => handleSetAsDefault(preset.id)}
+                  disabled={preset.isDefault}
+                >
+                  <Text style={[styles.presetQuickChipText, { color: preset.color }]}>{preset.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {activePresets.length > 4 && (
+          <TouchableOpacity onPress={() => setShowPresetSelector(true)}>
+            <Text style={[styles.viewAllText, { color: themeColors.tint }]}>
+              查看全部 {activePresets.length} 个预设
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>新建分类</Text>
+      <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+        <Text style={[styles.cardTitle, { color: themeColors.text }]}>新建分类</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: themeColors.surfaceHighlight, color: themeColors.text, borderColor: themeColors.border }]}
           value={categoryName}
           onChangeText={setCategoryName}
           placeholder="输入分类名称"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={themeColors.textTertiary}
           autoCapitalize="none"
         />
         <TagColorEditor label="分类颜色" value={categoryColor} onChange={setCategoryColor} defaultColor={DEFAULT_COLOR} />
         <Button title="添加分类" onPress={handleCreateCategory} loading={creatingCategory} disabled={!canCreateCategory} />
       </View>
 
-      <Text style={styles.sectionTitle}>按分类管理标签</Text>
-      {categories.length === 0 && uncategorizedCount === 0 ? <Text style={styles.muted}>暂无可管理标签</Text> : null}
-
-      {categories.map((category) => {
-        const count = (tagsByCategory.get(category.id) ?? []).length;
-        const categoryColor = normalizeHexColor(category.color, DEFAULT_COLOR);
-        return (
-          <TouchableOpacity
-            key={`entry-${category.id}`}
-            style={styles.entryBlock}
-            onPress={() => openCategoryTagManager(category.id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.rowMain}>
-              <View style={styles.rowTitleWrap}>
-                <View style={[styles.rowColorDot, { backgroundColor: categoryColor }]} />
-                <Text style={styles.rowTitle}>{category.name}</Text>
-              </View>
-              <Text style={styles.rowMeta}>{count} 个标签</Text>
-            </View>
-            <Text style={styles.actionText}>进入</Text>
-          </TouchableOpacity>
-        );
-      })}
-
-      <TouchableOpacity style={styles.entryBlock} onPress={() => openCategoryTagManager(null)} activeOpacity={0.7}>
-        <View style={styles.rowMain}>
-          <View style={styles.rowTitleWrap}>
-            <View style={[styles.rowColorDot, { backgroundColor: '#9ca3af' }]} />
-            <Text style={styles.rowTitle}>未分类</Text>
-          </View>
-          <Text style={styles.rowMeta}>{uncategorizedCount} 个标签</Text>
+      <Text style={[styles.sectionTitle, { color: themeColors.text }]}>分类管理</Text>
+      {categories.length === 0 && uncategorizedCount === 0 ? (
+        <View style={[styles.emptyCategoryCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+          <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>暂无分类</Text>
+          <Text style={[styles.emptyHint, { color: themeColors.textTertiary }]}>使用上方表单创建第一个分类</Text>
         </View>
-        <Text style={styles.actionText}>进入</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>分类管理</Text>
-      {categories.length === 0 ? <Text style={styles.muted}>暂无分类</Text> : null}
+      ) : null}
 
       {categories.map((category) => {
         const count = (tagsByCategory.get(category.id) ?? []).length;
         const categoryColor = normalizeHexColor(category.color, DEFAULT_COLOR);
         return (
-          <View key={`manage-${category.id}`} style={styles.manageBlock}>
+          <View key={`manage-${category.id}`} style={[styles.manageBlock, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
             <View style={styles.manageRow}>
-              <View style={styles.rowMain}>
+              <TouchableOpacity style={styles.rowMain} onPress={() => openCategoryTagManager(category.id)} activeOpacity={0.7}>
                 <View style={styles.rowTitleWrap}>
                   <View style={[styles.rowColorDot, { backgroundColor: categoryColor }]} />
-                  <Text style={styles.rowTitle}>{category.name}</Text>
+                  <Text style={[styles.rowTitle, { color: themeColors.text }]}>{category.name}</Text>
                 </View>
-                <Text style={styles.rowMeta}>
-                  {count} 个标签 · {categoryColor}
+                <Text style={[styles.rowMeta, { color: themeColors.textSecondary }]}>
+                  {count} 个标签
                 </Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.rowActions}>
                 <TouchableOpacity onPress={() => openCategoryTagManager(category.id)} activeOpacity={0.7}>
-                  <Text style={styles.actionText}>管理标签</Text>
+                  <Text style={[styles.actionLink, { color: themeColors.tint }]}>管理</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => startEditCategory(category)} activeOpacity={0.7}>
-                  <Text style={styles.actionText}>编辑</Text>
+                  <Text style={[styles.actionLink, { color: themeColors.tint }]}>编辑</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => handleDeleteCategoryPress(category.id)}
                   activeOpacity={0.7}
                   disabled={deletingCategoryId === category.id}
                 >
-                  <Text style={[styles.actionText, styles.deleteText]}>
+                  <Text style={[styles.actionLink, { color: themeColors.error }]}>
                     {deletingCategoryId === category.id ? '删除中...' : '删除'}
                   </Text>
                 </TouchableOpacity>
@@ -332,11 +806,11 @@ export default function TagManageScreen() {
             {editingCategoryId === category.id ? (
               <View style={styles.editorWrap}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: themeColors.surfaceHighlight, color: themeColors.text, borderColor: themeColors.border }]}
                   value={editingCategoryName}
                   onChangeText={setEditingCategoryName}
                   placeholder="分类名称"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={themeColors.textTertiary}
                 />
                 <TagColorEditor
                   label="分类颜色"
@@ -370,140 +844,94 @@ export default function TagManageScreen() {
         );
       })}
 
-      {loading ? <Text style={styles.muted}>加载中...</Text> : null}
+      <TouchableOpacity
+        style={[styles.uncategorizedBlock, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+        onPress={() => openCategoryTagManager(null)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.rowMain}>
+          <View style={styles.rowTitleWrap}>
+            <View style={[styles.rowColorDot, { backgroundColor: '#9ca3af' }]} />
+            <Text style={[styles.rowTitle, { color: themeColors.text }]}>未分类</Text>
+          </View>
+          <Text style={[styles.rowMeta, { color: themeColors.textSecondary }]}>{uncategorizedCount} 个标签</Text>
+        </View>
+        <Text style={[styles.actionText, { color: themeColors.tint }]}>管理</Text>
+      </TouchableOpacity>
+
+      {loading ? <Text style={[styles.muted, { color: themeColors.textTertiary }]}>加载中...</Text> : null}
+
+      <PresetManager
+        visible={showPresetManager}
+        onClose={() => setShowPresetManager(false)}
+        presets={presets.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          color: p.color,
+          itemCount: p.itemCount,
+          isActive: p.isActive,
+        }))}
+        onRefresh={loadPresets}
+        onCreatePreset={handleCreatePreset}
+        onUpdatePreset={handleUpdatePreset}
+        onDeletePreset={handleDeletePreset}
+        onDuplicatePreset={handleDuplicatePreset}
+        onAddTagToPreset={handleAddTagToPreset}
+        onRemoveTagFromPreset={handleRemoveTagFromPreset}
+        availableTags={availableTagsForPreset}
+        existingPresetTags={existingPresetTags}
+      />
+
+      <Modal visible={showPresetSelector} animationType="none" onRequestClose={() => setShowPresetSelector(false)}>
+        <View style={[styles.modalContainer, { backgroundColor: themeColors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: themeColors.border }]}>
+            <TouchableOpacity onPress={() => setShowPresetSelector(false)}>
+              <Text style={[styles.modalClose, { color: themeColors.tint }]}>关闭</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: themeColors.text }]}>选择预设</Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <FlatList
+            data={presets}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.presetList}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>暂无预设</Text>
+                <Text style={[styles.emptyHint, { color: themeColors.textTertiary }]}>点击上方"管理预设"创建</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.presetItem, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}
+                onPress={() => handleSetAsDefault(item.id)}
+              >
+                <View style={[styles.presetIndicator, { backgroundColor: item.color }]} />
+                <View style={styles.presetItemInfo}>
+                  <Text style={[styles.presetItemName, { color: themeColors.text }]}>{item.name}</Text>
+                  {item.description ? (
+                    <Text style={[styles.presetItemDesc, { color: themeColors.textSecondary }]}>{item.description}</Text>
+                  ) : null}
+                  <Text style={[styles.presetItemMeta, { color: themeColors.textTertiary }]}>
+                    {item.itemCount} 个标签 · {item.isDefault ? '默认' : item.isActive ? '已启用' : '已停用'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.presetApplyBtn, { backgroundColor: hexToRgba(item.color, 0.15) }]}
+                  onPress={() => handleSetAsDefault(item.id)}
+                  disabled={item.isDefault}
+                >
+                  <Text style={[styles.presetApplyText, { color: item.color }]}>
+                    {item.isDefault ? '当前默认' : '设为默认'}
+                  </Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { padding: 16, paddingBottom: 40 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 12,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    color: '#111827',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  hintText: {
-    color: '#475569',
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  selectedTagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    color: '#111827',
-    fontSize: 14,
-    lineHeight: 20,
-    ...Platform.select({
-      android: {
-        height: 44,
-        paddingVertical: 0,
-        textAlignVertical: 'center',
-      },
-      default: {
-        paddingVertical: 10,
-      },
-    }),
-  },
-  sectionTitle: {
-    color: '#111827',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  entryBlock: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  manageBlock: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-  },
-  manageRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rowMain: {
-    flex: 1,
-  },
-  rowTitleWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rowColorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.15)',
-  },
-  rowTitle: {
-    fontSize: 15,
-    color: '#111827',
-    fontWeight: '600',
-  },
-  rowMeta: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  rowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionText: {
-    fontSize: 13,
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  deleteText: {
-    color: '#dc2626',
-  },
-  editorWrap: {
-    marginTop: 10,
-  },
-  editorActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  flexButton: {
-    flex: 1,
-  },
-  gap: {
-    width: 10,
-  },
-  error: { color: '#dc2626', marginBottom: 12 },
-  muted: { color: '#6b7280', fontSize: 14, marginBottom: 8 },
-});
-

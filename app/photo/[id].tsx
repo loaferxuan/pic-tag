@@ -22,6 +22,8 @@ import {
   mergeTagCategoryCollapsedState,
   type TagCategoryCollapsedState,
 } from '@/shared/utils/tag-category-collapse';
+import * as presetService from '@/features/tag/services/tag-preset.service';
+import { hexToRgba } from '@/shared/utils/color';
 
 const NOTES_AUTOSAVE_DEBOUNCE_MS = 600;
 const NOTES_SAVED_HINT_MS = 1500;
@@ -87,6 +89,10 @@ export default function PhotoDetailScreen() {
   const [creatingQuickTag, setCreatingQuickTag] = useState(false);
   const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
   const [showTagLibrary, setShowTagLibrary] = useState(false);
+  const [showPresetSelector, setShowPresetSelector] = useState(false);
+  const [presets, setPresets] = useState<presetService.TagPresetDisplay[]>([]);
+  const [loadingPresets, setLoadingPresets] = useState(false);
+  const [applyingPreset, setApplyingPreset] = useState(false);
   const autoAppliedDefaultTagsPhotoIdsRef = useRef<Set<number>>(new Set());
   const attemptedPhotoUriRepairRef = useRef<Set<number>>(new Set());
   const notesDraftRef = useRef('');
@@ -400,6 +406,7 @@ export default function PhotoDetailScreen() {
 
   const applyTags = async (next: number[]) => {
     if (!photo || deletingPhoto) return;
+    const startTime = Date.now();
     setSelectedTagIds(next);
     setSavingTags(true);
     try {
@@ -407,17 +414,19 @@ export default function PhotoDetailScreen() {
       if (!usePhotoStore.getState().error) {
         await reloadDetailPhoto(photo.id, { silent: true });
       }
+      const elapsed = Date.now() - startTime;
+      console.log(`[Performance] applyTags completed in ${elapsed}ms for ${next.length} tags`);
     } finally {
       setSavingTags(false);
     }
   };
 
-  const toggleTag = (tagId: number) => {
+  const toggleTag = useCallback((tagId: number) => {
     const next = selectedTagIds.includes(tagId)
       ? selectedTagIds.filter((id) => id !== tagId)
       : [...selectedTagIds, tagId];
     void applyTags(next);
-  };
+  }, [selectedTagIds]);
 
   const toggleCategoryCollapsed = useCallback((categoryId: number) => {
     setCollapsedCategories((prev) => ({
@@ -426,15 +435,67 @@ export default function PhotoDetailScreen() {
     }));
   }, []);
 
-  const removeSelectedTag = (tagId: number) => {
+  const removeSelectedTag = useCallback((tagId: number) => {
     if (!selectedTagIds.includes(tagId)) return;
     void applyTags(selectedTagIds.filter((id) => id !== tagId));
-  };
+  }, [selectedTagIds]);
 
-  const clearAllTags = () => {
+  const clearAllTags = useCallback(() => {
     if (selectedTagIds.length === 0) return;
     void applyTags([]);
-  };
+  }, [selectedTagIds]);
+
+  const loadPresets = useCallback(async () => {
+    const startTime = Date.now();
+    setLoadingPresets(true);
+    try {
+      const data = await presetService.getAllPresets();
+      setPresets(data.filter((p) => p.isActive && p.itemCount > 0));
+      const elapsed = Date.now() - startTime;
+      console.log(`[Performance] loadPresets completed in ${elapsed}ms, loaded ${data.length} presets`);
+    } finally {
+      setLoadingPresets(false);
+    }
+  }, []);
+
+  const openPresetSelector = useCallback(() => {
+    if (deletingPhoto) return;
+    void loadPresets();
+    setShowPresetSelector(true);
+  }, [deletingPhoto, loadPresets]);
+
+  const closePresetSelector = useCallback(() => {
+    setShowPresetSelector(false);
+  }, []);
+
+  const applyPresetToPhoto = useCallback(
+    async (preset: presetService.TagPresetDisplay) => {
+      if (!photo || deletingPhoto || applyingPreset) return;
+
+      const startTime = Date.now();
+      setApplyingPreset(true);
+      try {
+        const presetTagIds = preset.items
+          .filter((item) => item.type === 'existing' && item.tagId !== undefined)
+          .map((item) => item.tagId as number);
+
+        const mergedTagIds = Array.from(new Set([...selectedTagIds, ...presetTagIds]));
+
+        await applyTags(mergedTagIds);
+        const elapsed = Date.now() - startTime;
+        console.log(`[Performance] applyPresetToPhoto completed in ${elapsed}ms`);
+        Alert.alert('应用成功', `已成功将预设"${preset.name}"中的${presetTagIds.length}个标签添加到照片`);
+        setShowPresetSelector(false);
+      } catch {
+        const elapsed = Date.now() - startTime;
+        console.log(`[Performance] applyPresetToPhoto failed after ${elapsed}ms`);
+        Alert.alert('应用失败', '无法应用预设，请稍后重试');
+      } finally {
+        setApplyingPreset(false);
+      }
+    },
+    [applyingPreset, deletingPhoto, photo, selectedTagIds]
+  );
 
   const resetQuickCreateForm = useCallback(() => {
     setQuickTagName('');
@@ -457,6 +518,7 @@ export default function PhotoDetailScreen() {
 
   const handleCreateQuickTag = async () => {
     if (!photo || deletingPhoto || creatingQuickTag) return;
+    const startTime = Date.now();
 
     const name = quickTagName.trim();
     if (!name) {
@@ -488,6 +550,8 @@ export default function PhotoDetailScreen() {
       await reloadTagsWithCategories();
       const nextTagIds = Array.from(new Set([...selectedTagIds, created.id]));
       await applyTags(nextTagIds);
+      const elapsed = Date.now() - startTime;
+      console.log(`[Performance] handleCreateQuickTag completed in ${elapsed}ms`);
       setShowQuickCreateModal(false);
       resetQuickCreateForm();
     } finally {
@@ -895,6 +959,15 @@ export default function PhotoDetailScreen() {
         {selectedTagIds.length > 0 ? (
           <Button title="清空照片标签" onPress={clearAllTags} variant="outline" disabled={deletingPhoto} />
         ) : null}
+
+        <TouchableOpacity
+          style={[styles.presetApplyButton, deletingPhoto && styles.headerActionDisabled]}
+          onPress={openPresetSelector}
+          activeOpacity={0.7}
+          disabled={deletingPhoto}
+        >
+          <Text style={styles.presetApplyButtonText}>应用预设标签</Text>
+        </TouchableOpacity>
       </View>
 
       {showTagLibrary ? (
@@ -978,7 +1051,7 @@ export default function PhotoDetailScreen() {
           </View>
 
           {showQuickCreateModal ? (
-            <Modal visible={showQuickCreateModal} animationType="slide" transparent onRequestClose={closeQuickCreateModal}>
+            <Modal visible={showQuickCreateModal} animationType="none" transparent onRequestClose={closeQuickCreateModal}>
               <View style={styles.quickCreateModalOverlay}>
                 <TouchableOpacity
                   style={StyleSheet.absoluteFillObject}
@@ -1088,6 +1161,93 @@ export default function PhotoDetailScreen() {
                       loading={creatingQuickTag}
                       disabled={!canCreateQuickTag}
                       style={styles.flexButton}
+                    />
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          ) : null}
+
+          {showPresetSelector ? (
+            <Modal visible={showPresetSelector} animationType="none" transparent onRequestClose={closePresetSelector}>
+              <View style={styles.presetModalOverlay}>
+                <TouchableOpacity
+                  style={StyleSheet.absoluteFillObject}
+                  activeOpacity={1}
+                  onPress={closePresetSelector}
+                  disabled={applyingPreset}
+                />
+                <View style={styles.presetModalCard}>
+                  <Text style={styles.presetModalTitle}>应用预设标签</Text>
+                  <Text style={styles.presetModalHint}>
+                    选择一个预设，将其中的标签添加到当前照片。已有标签不会被移除。
+                  </Text>
+
+                  {loadingPresets ? (
+                    <Text style={styles.emptyHint}>加载中...</Text>
+                  ) : null}
+
+                  {!loadingPresets && presets.length === 0 ? (
+                    <View style={styles.presetEmptyState}>
+                      <Text style={styles.emptyHint}>暂无可用的标签预设</Text>
+                      <Text style={styles.emptyHint}>请先在标签管理页面创建预设</Text>
+                    </View>
+                  ) : null}
+
+                  {presets.length > 0 ? (
+                    <View style={styles.presetList}>
+                      {presets.map((preset) => (
+                        <TouchableOpacity
+                          key={`preset-${preset.id}`}
+                          style={[styles.presetItem, { borderColor: preset.color }]}
+                          onPress={() => {
+                            void applyPresetToPhoto(preset);
+                          }}
+                          activeOpacity={0.7}
+                          disabled={applyingPreset}
+                        >
+                          <View style={styles.presetItemHeader}>
+                            <View style={[styles.presetItemDot, { backgroundColor: preset.color }]} />
+                            <Text style={styles.presetItemName}>{preset.name}</Text>
+                            {preset.isDefault && (
+                              <View style={[styles.presetDefaultBadge, { backgroundColor: hexToRgba(preset.color, 0.15) }]}>
+                                <Text style={[styles.presetDefaultBadgeText, { color: preset.color }]}>默认</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.presetItemMeta}>
+                            {preset.itemCount} 个标签
+                          </Text>
+                          <View style={styles.presetItemTags}>
+                            {preset.items.slice(0, 4).map((item, index) => {
+                              const tagName = item.type === 'existing' ? item.tagName : item.customName;
+                              return (
+                                <View
+                                  key={`preset-tag-${preset.id}-${index}`}
+                                  style={[styles.presetItemTag, { backgroundColor: hexToRgba(preset.color, 0.1) }]}
+                                >
+                                  <Text style={[styles.presetItemTagText, { color: preset.color }]}>
+                                    {tagName ?? '标签'}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                            {preset.items.length > 4 && (
+                              <Text style={styles.presetItemMoreText}>+{preset.items.length - 4}</Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.presetModalActions}>
+                    <Button
+                      title="取消"
+                      onPress={closePresetSelector}
+                      variant="outline"
+                      style={styles.flexButton}
+                      disabled={applyingPreset}
                     />
                   </View>
                 </View>
@@ -1434,6 +1594,121 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: '#dc2626',
+  },
+  presetApplyButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  presetApplyButtonText: {
+    color: '#4f46e5',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  presetModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  presetModalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  presetModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  presetModalHint: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  presetEmptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  presetList: {
+    maxHeight: 400,
+  },
+  presetItem: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#ffffff',
+  },
+  presetItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  presetItemDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  presetItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+  },
+  presetDefaultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  presetDefaultBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  presetItemMeta: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  presetItemTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  presetItemTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  presetItemTagText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  presetItemMoreText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 4,
+  },
+  presetModalActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
   },
 });
 

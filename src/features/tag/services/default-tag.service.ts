@@ -59,3 +59,16 @@ export async function saveDefaultTagIds(tagIds: number[]): Promise<number[]> {
   await repos.settings.set(KV_DEFAULT_TAG_IDS, JSON.stringify(sanitized));
   return sanitized;
 }
+
+export async function getDefaultTagIdsFromPreset(): Promise<number[]> {
+  const repos = await getRepositories();
+  return repos.tagPreset.getDefaultPresetTagIds();
+}
+
+export async function syncDefaultTagIdsFromPreset(): Promise<number[]> {
+  const tagIds = await getDefaultTagIdsFromPreset();
+  if (tagIds.length > 0) {
+    await saveDefaultTagIds(tagIds);
+  }
+  return tagIds;
+}

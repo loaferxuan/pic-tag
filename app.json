@@ -2,13 +2,13 @@
   "expo": {
     "name": "PicTag",
     "slug": "pic-tag",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pictag",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
@@ -32,7 +32,7 @@
     },
     "android": {
       "package": "com.pictag.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#016BE5"
@@ -67,7 +67,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6265028b-2b79-4538-89ed-f013d6cdbd2f"
+        "projectId": "4dc9e7e3-6279-4d2c-9f6e-afd419c85d79"
       }
     }
   }

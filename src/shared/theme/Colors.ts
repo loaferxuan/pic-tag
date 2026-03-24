@@ -1,30 +1,62 @@
-const tintColorLight = '#4f46e5'; // Indigo 600
-const tintColorDark = '#818cf8'; // Indigo 400
+const tintColorLight = '#4f46e5';
+const tintColorDark = '#818cf8';
 
 const Colors = {
   light: {
-    text: '#0f172a', // Slate 900
-    textSecondary: '#64748b', // Slate 500
-    background: '#f8fafc', // Slate 50
+    text: '#111827',
+    textSecondary: '#6b7280',
+    textTertiary: '#9ca3af',
+    background: '#ffffff',
     tint: tintColorLight,
-    tabIconDefault: '#94a3b8', // Slate 400
+    tintLight: '#818cf8',
+    tabIconDefault: '#9ca3af',
     tabIconSelected: tintColorLight,
-    border: '#e2e8f0', // Slate 200
+    border: '#e5e7eb',
+    borderLight: '#f3f4f6',
     card: '#ffffff',
     surface: '#ffffff',
-    surfaceHighlight: '#f1f5f9', // Slate 100
+    surfaceHighlight: '#f9fafb',
+    surfaceHover: '#f1f5f9',
+    shadow: '#000000',
+    success: '#10b981',
+    successLight: '#d1fae5',
+    warning: '#f59e0b',
+    warningLight: '#fef3c7',
+    error: '#ef4444',
+    errorLight: '#fee2e2',
+    info: '#3b82f6',
+    infoLight: '#dbeafe',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+    divider: '#e5e7eb',
+    disabled: '#d1d5db',
   },
   dark: {
-    text: '#f8fafc', // Slate 50
-    textSecondary: '#94a3b8', // Slate 400
-    background: '#0f172a', // Slate 900
+    text: '#f9fafb',
+    textSecondary: '#9ca3af',
+    textTertiary: '#6b7280',
+    background: '#111827',
     tint: tintColorDark,
-    tabIconDefault: '#475569', // Slate 600
+    tintLight: '#a5b4fc',
+    tabIconDefault: '#6b7280',
     tabIconSelected: tintColorDark,
-    border: '#1e293b', // Slate 800
-    card: '#1e293b', // Slate 800
-    surface: '#1e293b',
-    surfaceHighlight: '#334155', // Slate 700
+    border: '#374151',
+    borderLight: '#1f2937',
+    card: '#1f2937',
+    surface: '#1f2937',
+    surfaceHighlight: '#374151',
+    surfaceHover: '#4b5563',
+    shadow: '#000000',
+    success: '#34d399',
+    successLight: '#064e3b',
+    warning: '#fbbf24',
+    warningLight: '#78350f',
+    error: '#f87171',
+    errorLight: '#7f1d1d',
+    info: '#60a5fa',
+    infoLight: '#1e3a8a',
+    overlay: 'rgba(0, 0, 0, 0.7)',
+    divider: '#374151',
+    disabled: '#4b5563',
   },
 };
 

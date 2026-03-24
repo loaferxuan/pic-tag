@@ -844,7 +844,7 @@ export function PhotoImporter({
       <Modal
         visible={storageNoticeVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         statusBarTranslucent
         onRequestClose={closeStorageNotice}
       >
@@ -881,7 +881,7 @@ export function PhotoImporter({
         </View>
       </Modal>
 
-      <Modal visible={modalVisible} animationType="slide" onRequestClose={closePicker}>
+      <Modal visible={modalVisible} animationType="none" onRequestClose={closePicker}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>选择照片</Text>
@@ -970,7 +970,7 @@ export function PhotoImporter({
           </View>
         </View>
 
-        <Modal visible={albumPickerVisible} transparent animationType="fade" onRequestClose={() => setAlbumPickerVisible(false)}>
+        <Modal visible={albumPickerVisible} transparent animationType="none" onRequestClose={() => setAlbumPickerVisible(false)}>
           <View style={styles.albumOverlay}>
             <TouchableOpacity
               style={StyleSheet.absoluteFillObject}

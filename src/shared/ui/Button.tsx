@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Pressable } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import Colors from '@/shared/theme/Colors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 
@@ -15,9 +14,7 @@ interface ButtonProps {
   icon?: React.ReactNode;
 }
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-export function Button({
+export const Button = React.memo(function Button({
   title,
   onPress,
   variant = 'primary',
@@ -31,33 +28,7 @@ export function Button({
   const colors = Colors[colorScheme];
   const isDisabled = disabled || loading;
 
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
-
-  const handlePressIn = () => {
-    if (isDisabled) return;
-    scale.value = withSpring(0.96, {
-      damping: 10,
-      stiffness: 400,
-    });
-    opacity.value = withTiming(0.8, { duration: 150 });
-  };
-
-  const handlePressOut = () => {
-    if (isDisabled) return;
-    scale.value = withSpring(1, {
-      damping: 10,
-      stiffness: 400,
-    });
-    opacity.value = withTiming(1, { duration: 150 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: isDisabled ? 0.5 : opacity.value,
-  }));
-
-  const getBackgroundColor = () => {
+  const backgroundColor = useMemo(() => {
     switch (variant) {
       case 'primary':
         return colors.tint;
@@ -66,10 +37,12 @@ export function Button({
       case 'outline':
       case 'ghost':
         return 'transparent';
+      default:
+        return colors.tint;
     }
-  };
+  }, [variant, colors.tint, colors.surfaceHighlight, colors.border, colorScheme]);
 
-  const getTextColor = () => {
+  const textColor = useMemo(() => {
     switch (variant) {
       case 'primary':
         return '#ffffff';
@@ -78,40 +51,46 @@ export function Button({
       case 'outline':
       case 'ghost':
         return colors.tint;
+      default:
+        return '#ffffff';
     }
-  };
+  }, [variant, colors.tint, colors.text]);
+
+  const outlineStyle = useMemo(
+    () => (variant === 'outline' ? { borderWidth: 1, borderColor: colors.border } : {}),
+    [variant, colors.border]
+  );
+
+  const disabledOpacity = isDisabled ? 0.5 : 1;
 
   return (
-    <AnimatedPressable
+    <Pressable
       style={[
         styles.base,
-        { backgroundColor: getBackgroundColor() },
-        variant === 'outline' && { borderWidth: 1, borderColor: colors.border },
+        { backgroundColor, opacity: disabledOpacity },
+        outlineStyle,
         style,
-        animatedStyle,
       ]}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       disabled={isDisabled}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={getTextColor()} />
+        <ActivityIndicator size="small" color={textColor} />
       ) : (
         <>
-          {icon && <Animated.View style={styles.iconContainer}>{icon}</Animated.View>}
-          <Text style={[styles.text, { color: getTextColor() }, textStyle]}>{title}</Text>
+          {icon && <View style={styles.iconContainer}>{icon}</View>}
+          <Text style={[styles.text, { color: textColor }, textStyle]}>{title}</Text>
         </>
       )}
-    </AnimatedPressable>
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   base: {
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 16, // More rounded, modern feel
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

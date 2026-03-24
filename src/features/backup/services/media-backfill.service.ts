@@ -315,6 +315,7 @@ async function backfillBySourceAssetIdInternal(limit: number): Promise<BackfillS
       if (takenDate && takenDate !== pendingPhoto.taken_date) {
         await repos.photo.update(pendingPhotoId, { taken_date: takenDate });
       }
+
       const resolved = await resolvePendingForPhoto(pendingPhotoId);
       summary.bySourceMatched += resolved.resolved;
       continue;

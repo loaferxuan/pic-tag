@@ -23,7 +23,7 @@ export default function TabLayout() {
         headerShown: true,
         headerStyle: {
           backgroundColor: colors.surface,
-          shadowColor: 'transparent', // remove default border/shadow
+          shadowColor: 'transparent',
           elevation: 0,
         },
         headerTitleStyle: {

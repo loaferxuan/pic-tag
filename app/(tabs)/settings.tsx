@@ -470,7 +470,7 @@ export default function SettingsScreen() {
 
       <Modal
         visible={importConfirmVisible}
-        animationType="fade"
+        animationType="none"
         transparent
         statusBarTranslucent
         onRequestClose={() => {

@@ -3,7 +3,7 @@ import { KV_SCHEMA_VERSION } from '@/shared/constants';
 import * as seedDefaultTags from './seed-default-tags';
 import * as seedAdditionalTags from './seed-additional-default-tags';
 
-export const DATABASE_SCHEMA_VERSION = 1;
+export const DATABASE_SCHEMA_VERSION = 3;
 
 async function getCurrentSchemaVersion(db: SQLiteDatabase): Promise<number> {
   try {
@@ -30,6 +30,8 @@ async function rebuildSchema(db: SQLiteDatabase): Promise<void> {
     DROP TABLE IF EXISTS tags;
     DROP TABLE IF EXISTS tag_categories;
     DROP TABLE IF EXISTS kv_store;
+    DROP TABLE IF EXISTS tag_presets;
+    DROP TABLE IF EXISTS tag_preset_items;
     DROP TABLE IF EXISTS photo_albums;
     DROP TABLE IF EXISTS albums;
 
@@ -106,6 +108,39 @@ async function rebuildSchema(db: SQLiteDatabase): Promise<void> {
       last_attempt_at TEXT,
       resolved_at TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS tag_presets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      color TEXT NOT NULL DEFAULT '#6366F1',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS tag_preset_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      preset_id INTEGER NOT NULL REFERENCES tag_presets(id) ON DELETE CASCADE,
+      tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+      custom_tag_name TEXT,
+      custom_tag_color TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(preset_id, tag_id, custom_tag_name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tag_presets_sort_order
+      ON tag_presets(sort_order, id);
+    CREATE INDEX IF NOT EXISTS idx_tag_presets_is_active
+      ON tag_presets(is_active);
+
+    CREATE INDEX IF NOT EXISTS idx_tag_preset_items_preset_id
+      ON tag_preset_items(preset_id);
+    CREATE INDEX IF NOT EXISTS idx_tag_preset_items_tag_id
+      ON tag_preset_items(tag_id);
 
     CREATE TABLE IF NOT EXISTS kv_store (
       key TEXT PRIMARY KEY,
