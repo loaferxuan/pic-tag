@@ -37,6 +37,12 @@ function resolveChannelKey(): string | null {
   return normalizeNonEmptyString(extra.channelKey);
 }
 
+function resolveAppVariant(): string | null {
+  const extra = Constants.expoConfig?.extra as Record<string, unknown> | undefined;
+  if (!extra) return null;
+  return normalizeNonEmptyString(extra.appVariant);
+}
+
 export interface NativeUpdateServiceDeps {
   getCredentials: typeof getPgyerCredentials;
   requestLatest: typeof checkPgyerLatest;
@@ -53,6 +59,11 @@ export function createNativeUpdateService(deps?: Partial<NativeUpdateServiceDeps
   let lastPromptedBuildKey: string | null = null;
 
   const checkCore = async (mode: 'startup' | 'manual'): Promise<NativeUpdateCheckResult> => {
+    // Dev 变体的 JS 始终来自 Metro，APK 升级链路不适用；直接短路，避免误拉 Release 的更新信息。
+    if (resolveAppVariant() === 'development') {
+      return { kind: 'up_to_date' };
+    }
+
     const credentials = getCredentials();
     if (!credentials) {
       return { kind: 'misconfigured' };

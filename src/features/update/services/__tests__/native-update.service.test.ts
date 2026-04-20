@@ -1,15 +1,25 @@
 import type { NativeUpdateServiceDeps } from '@/features/update/services/native-update.service';
 import { PgyerClientError, PgyerNetworkError, type PgyerCheckData } from '@/features/update/services/pgyer.client';
 
-jest.mock('expo-constants', () => ({
-  __esModule: true,
+const expoConstantsMock: { default: { expoConfig: { version: string; extra: Record<string, unknown> } } } = {
   default: {
     expoConfig: {
       version: '1.0.0',
       extra: {},
     },
   },
+};
+
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  get default() {
+    return expoConstantsMock.default;
+  },
 }));
+
+beforeEach(() => {
+  expoConstantsMock.default.expoConfig.extra = {};
+});
 
 const { createNativeUpdateService } = require('@/features/update/services/native-update.service') as {
   createNativeUpdateService: (deps?: Partial<NativeUpdateServiceDeps>) => {
@@ -126,6 +136,18 @@ describe('native update service', () => {
 
     await expect(service.checkOnStartup()).resolves.toEqual({ kind: 'misconfigured' });
     expect(requestLatest).not.toHaveBeenCalled();
+  });
+
+  it('short-circuits to up_to_date in development variant without calling network', async () => {
+    expoConstantsMock.default.expoConfig.extra = { appVariant: 'development' };
+    const requestLatest = jest.fn(async () => buildData());
+    const getCredentials = jest.fn(() => ({ appKey: 'app-key', apiKey: 'api-key' }));
+    const service = createNativeUpdateService({ getCredentials, requestLatest });
+
+    await expect(service.checkOnStartup()).resolves.toEqual({ kind: 'up_to_date' });
+    await expect(service.checkManually()).resolves.toEqual({ kind: 'up_to_date' });
+    expect(requestLatest).not.toHaveBeenCalled();
+    expect(getCredentials).not.toHaveBeenCalled();
   });
 
   it('dedupes same build on startup but not on manual check', async () => {
