@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { getDb } from '@/infra/db/client';
 import { startFingerprintBootstrap } from '@/features/photo/services/photo-fingerprint.service';
+import { UpdatePromptHost } from '@/features/update/ui/UpdatePromptHost';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -48,13 +49,15 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" options={{ freezeOnBlur: true }} />
-        <Stack.Screen name="tag/manage/[categoryKey]" options={{ headerShown: true, title: '标签管理' }} />
-        <Stack.Screen name="photo/[id]" options={{ headerShown: true, title: '照片详情' }} />
-        <Stack.Screen name="tag/manage" options={{ headerShown: true, title: '标签管理' }} />
-        <Stack.Screen name="stats/[categoryKey]" options={{ headerShown: true, title: '分类详情' }} />
-      </Stack>
+      <UpdatePromptHost>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" options={{ freezeOnBlur: true }} />
+          <Stack.Screen name="tag/manage/[categoryKey]" options={{ headerShown: true, title: '标签管理' }} />
+          <Stack.Screen name="photo/[id]" options={{ headerShown: true, title: '照片详情' }} />
+          <Stack.Screen name="tag/manage" options={{ headerShown: true, title: '标签管理' }} />
+          <Stack.Screen name="stats/[categoryKey]" options={{ headerShown: true, title: '分类详情' }} />
+        </Stack>
+      </UpdatePromptHost>
     </ThemeProvider>
   );
 }

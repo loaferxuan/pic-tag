@@ -20,6 +20,7 @@ import {
 import { getAppVersionMeta } from '@/features/settings/services/version.service';
 import { useTagStore } from '@/features/tag/store/tag.store';
 import { usePhotoStore } from '@/features/photo/store/photo.store';
+import { useManualUpdateCheck } from '@/features/update/ui/UpdatePromptHost';
 
 const IMPORT_UI_DEBUG_PREFIX = '[backup.import.ui]';
 const IMPORT_CONFIRM_COUNTDOWN_SECONDS = 4;
@@ -137,6 +138,7 @@ function showUnshareableAlert(params: {
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const triggerManualUpdateCheck = useManualUpdateCheck();
   const reloadTagsWithCategories = useTagStore((s) => s.loadTagsWithCategories);
   const reloadPhotos = usePhotoStore((s) => s.loadPhotos);
   const [exportingData, setExportingData] = useState(false);
@@ -260,6 +262,23 @@ export default function SettingsScreen() {
 
   const handleExportData = () => {
     void runExportData();
+  };
+
+  const handleManualCheckUpdate = () => {
+    void (async () => {
+      const result = await triggerManualUpdateCheck();
+      if (result.kind === 'up_to_date') {
+        Alert.alert('检查更新', `已是最新版 ${appVersionMeta.appVersion}`);
+        return;
+      }
+      if (result.kind === 'misconfigured') {
+        Alert.alert('检查更新', '未配置蒲公英应用信息，请联系开发者。');
+        return;
+      }
+      if (result.kind === 'network_error') {
+        Alert.alert('检查更新', result.message || '网络异常，请稍后再试。');
+      }
+    })();
   };
 
   const runImportData = async () => {
@@ -465,6 +484,7 @@ export default function SettingsScreen() {
               <Text style={styles.versionLine}>Git Commit：{appVersionMeta.gitCommitShort ?? '未知'}</Text>
             </>
           ) : null}
+          <Button title="检查更新" variant="outline" onPress={handleManualCheckUpdate} style={styles.updateButton} />
         </View>
       </ScrollView>
 
@@ -622,6 +642,9 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 12,
     marginBottom: 2,
+  },
+  updateButton: {
+    marginTop: 10,
   },
   importConfirmOverlay: {
     flex: 1,

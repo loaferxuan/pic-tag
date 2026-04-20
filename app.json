@@ -66,6 +66,9 @@
     },
     "extra": {
       "router": {},
+      "pgyer": {
+        "appKey": "287f020da45bba8012d34b47bf7ae950"
+      },
       "eas": {
         "projectId": "6265028b-2b79-4538-89ed-f013d6cdbd2f"
       }
