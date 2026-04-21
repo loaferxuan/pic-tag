@@ -10,7 +10,9 @@
     "lint": "eslint . --ext .ts,.tsx,.js,.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "fingerprint": "expo-updates fingerprint:generate",
+    "fingerprint:diff": "expo-updates fingerprint:generate --platform android > .tmp-fingerprint.json && git diff --no-index .tmp-fingerprint.prev.json .tmp-fingerprint.json || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -44,6 +46,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@expo/fingerprint": "^0.16.6",
     "@types/jest": "^29.5.12",
     "@types/react": "~19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",

@@ -1,0 +1,17 @@
+# 文档与规范
+AGENTS.md
+README*
+docs/
+*.md
+
+# 测试与 fixture
+**/__tests__/**
+**/*.test.ts
+**/*.test.tsx
+jest.config.*
+
+# 工具/IDE
+.cursor/
+.vscode/
+terminals/
+agent-transcripts/

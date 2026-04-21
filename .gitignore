@@ -45,6 +45,7 @@ yarn-error.*
 
 # local diagnostics
 .tmp-autolink.json
+.tmp-fingerprint*.json
 
 # local tool caches (workspace-mapped APPDATA/LOCALAPPDATA)
 .appdata/

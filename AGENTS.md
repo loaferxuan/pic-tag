@@ -18,6 +18,10 @@
 - 配置项 `expo.extra.pgyer.appKey` 允许提交到仓库；`_api_key` 禁止写入仓库。
 - `_api_key` 通过 EAS Secret 注入：`eas secret:create --scope project --name EXPO_PUBLIC_PGYER_API_KEY --value <你的_api_key>`。
 - 本地调试可临时在 `expo.extra.pgyer.apiKey` 填值，联调后必须删除并改回 EAS Secret。
+- `runtimeVersion` 使用 fingerprint 策略，由 `@expo/fingerprint` 自动维护，任何人不得手工改写为字符串。屏蔽规则见 `fingerprint.config.js` 与 `.fingerprintignore`。
+- 纯 JS/TS 改动：`npx eas update --channel production --message "<一句话>"`，指纹不变即所有现役 APK 自动拿到新 bundle。
+- 原生依赖 / 插件 / `app.json` 原生字段改动：必须 `eas build` 重出 APK 并上传蒲公英，由应用内检查更新按钮/启动自检引导老用户升级。
+- 发版前不确定是否影响原生时，先运行 `npm run fingerprint` 连续两次对比哈希；哈希变化即表示需要重新构建 APK。
 
 ### 3.1 ABI 与蒲公英分发注意事项
 - 蒲公英 App Check API 对同一个 `appKey` 只返回「最后一次上传」的 build 的 `downloadURL`，即新版覆盖式替换。
