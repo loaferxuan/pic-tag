@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { Alert, View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTagsWithCategories } from '@/features/tag/hooks/useTags';
 import { useTagStore } from '@/features/tag/store/tag.store';
@@ -190,7 +191,12 @@ export default function CategoryTagManageScreen() {
   return (
     <>
       <Stack.Screen options={{ title: screenTitle }} />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
+      >
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <View style={styles.card}>
@@ -300,7 +306,7 @@ export default function CategoryTagManageScreen() {
             </View>
           );
         })}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </>
   );
 }

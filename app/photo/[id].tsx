@@ -1,5 +1,6 @@
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, TextInput, Modal, InteractionManager } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Alert, TextInput, Modal, InteractionManager } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -764,7 +765,12 @@ export default function PhotoDetailScreen() {
           ),
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <KeyboardAwareScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
+      >
       {shouldShowPhotoPlaceholder ? (
         <View style={styles.imagePlaceholder}>
           <Text style={styles.imagePlaceholderTitle}>原照片文件当前不可用</Text>
@@ -979,7 +985,7 @@ export default function PhotoDetailScreen() {
 
           {showQuickCreateModal ? (
             <Modal visible={showQuickCreateModal} animationType="slide" transparent onRequestClose={closeQuickCreateModal}>
-              <View style={styles.quickCreateModalOverlay}>
+              <KeyboardAvoidingView behavior="padding" style={styles.quickCreateModalOverlay}>
                 <TouchableOpacity
                   style={StyleSheet.absoluteFillObject}
                   activeOpacity={1}
@@ -1091,7 +1097,7 @@ export default function PhotoDetailScreen() {
                     />
                   </View>
                 </View>
-              </View>
+              </KeyboardAvoidingView>
             </Modal>
           ) : null}
 
@@ -1108,7 +1114,7 @@ export default function PhotoDetailScreen() {
           </View>
         </>
       ) : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
     </>
   );
 }

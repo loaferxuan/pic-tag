@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { Alert, View, Text, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useRouter } from 'expo-router';
 import { useTagsWithCategories } from '@/features/tag/hooks/useTags';
 import { useTagStore } from '@/features/tag/store/tag.store';
@@ -180,7 +181,12 @@ export default function TagManageScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      bottomOffset={24}
+    >
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.card}>
@@ -371,7 +377,7 @@ export default function TagManageScreen() {
       })}
 
       {loading ? <Text style={styles.muted}>加载中...</Text> : null}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 
