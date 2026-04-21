@@ -984,7 +984,14 @@ export default function PhotoDetailScreen() {
           </View>
 
           {showQuickCreateModal ? (
-            <Modal visible={showQuickCreateModal} animationType="slide" transparent onRequestClose={closeQuickCreateModal}>
+            <Modal
+              visible={showQuickCreateModal}
+              animationType="slide"
+              transparent
+              statusBarTranslucent
+              navigationBarTranslucent
+              onRequestClose={closeQuickCreateModal}
+            >
               <KeyboardAvoidingView behavior="padding" style={styles.quickCreateModalOverlay}>
                 <TouchableOpacity
                   style={StyleSheet.absoluteFillObject}

@@ -49,7 +49,7 @@ export default function RootLayout() {
   }
 
   return (
-    <KeyboardProvider>
+    <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
       <ThemeProvider value={DefaultTheme}>
         <UpdatePromptHost>
           <Stack screenOptions={{ headerShown: false }}>
