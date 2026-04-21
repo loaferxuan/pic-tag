@@ -24,6 +24,7 @@ npx eas build --platform android --profile store
 - `release-apk-armv7` 只给明确仍在使用 32 位设备的用户。
 - `store` 产物是 AAB，不用于手动分发。
 - `development` 只用于开发调试，保留 Dev Client。
+- 上传蒲公英内部分发时，不要把 `release-apk-arm64` 和 `release-apk-armv7` 上传到同一个蒲公英 App（Check API 只返回最后一次上传 build 的 `downloadURL`）。详见 [AGENTS.md](AGENTS.md) 第 3.1 节。
 
 ## 当前瘦身策略
 

@@ -18,3 +18,9 @@
 - 配置项 `expo.extra.pgyer.appKey` 允许提交到仓库；`_api_key` 禁止写入仓库。
 - `_api_key` 通过 EAS Secret 注入：`eas secret:create --scope project --name EXPO_PUBLIC_PGYER_API_KEY --value <你的_api_key>`。
 - 本地调试可临时在 `expo.extra.pgyer.apiKey` 填值，联调后必须删除并改回 EAS Secret。
+
+### 3.1 ABI 与蒲公英分发注意事项
+- 蒲公英 App Check API 对同一个 `appKey` 只返回「最后一次上传」的 build 的 `downloadURL`，即新版覆盖式替换。
+- 因此 `eas.json` 中的 `release-apk-arm64` 与 `release-apk-armv7` 不要同时上传到同一个蒲公英 App，否则会出现 arm64 设备拉到 armv7 APK（或反之）的情况。
+- 推荐做法：只把 `release-apk-arm64` 作为默认分发上传到蒲公英（arm64 设备占 95%+），`release-apk-armv7` 仅用于线下点对点支持。
+- 若确需同时兼容 32 位，请改走单个「多 ABI 通用 APK」（在构建配置中将 `ANDROID_BUILD_ARCHS` 设为 `arm64-v8a,armeabi-v7a`）再上传，保持「一个蒲公英 App = 一个 build」。

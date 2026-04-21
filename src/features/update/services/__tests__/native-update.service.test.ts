@@ -101,16 +101,31 @@ describe('native update service', () => {
     });
   });
 
-  it('maps misconfigured errors from pgyer codes', async () => {
+  it.each([1002, 1009, 1055, 1076])('maps misconfigured error code %s to misconfigured', async (code) => {
     const service = createNativeUpdateService(
       createMockDeps({
         requestLatest: async () => {
-          throw new PgyerClientError('invalid key', 1002);
+          throw new PgyerClientError(`pgyer error ${code}`, code);
         },
       })
     );
 
     await expect(service.checkOnStartup()).resolves.toEqual({ kind: 'misconfigured' });
+  });
+
+  it('keeps non-misconfigured pgyer codes as network_error', async () => {
+    const service = createNativeUpdateService(
+      createMockDeps({
+        requestLatest: async () => {
+          throw new PgyerClientError('rate limited', 1216);
+        },
+      })
+    );
+
+    await expect(service.checkOnStartup()).resolves.toEqual({
+      kind: 'network_error',
+      message: 'rate limited',
+    });
   });
 
   it('maps network errors from pgyer client', async () => {

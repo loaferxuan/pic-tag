@@ -71,16 +71,30 @@ export class PgyerNetworkError extends Error {
 }
 
 function parsePgyerData(payload: PgyerCheckDataPayload): PgyerCheckData {
+  const hasNewVersion = toBoolean(payload.buildHaveNewVersion);
+
+  if (!hasNewVersion) {
+    return {
+      buildHaveNewVersion: false,
+      needForceUpdate: toBoolean(payload.needForceUpdate),
+      downloadURL: normalizeNonEmptyString(payload.downloadURL) ?? '',
+      buildVersion: normalizeNonEmptyString(payload.buildVersion) ?? '',
+      buildVersionNo: normalizeNonEmptyString(payload.buildVersionNo),
+      buildUpdateDescription: normalizeNonEmptyString(payload.buildUpdateDescription),
+      buildKey: normalizeNonEmptyString(payload.buildKey) ?? '',
+    };
+  }
+
   const buildKey = normalizeNonEmptyString(payload.buildKey);
   const downloadURL = normalizeNonEmptyString(payload.downloadURL);
   const buildVersion = normalizeNonEmptyString(payload.buildVersion);
 
   if (!buildKey || !downloadURL || !buildVersion) {
-    throw new PgyerClientError('蒲公英返回数据不完整');
+    throw new PgyerClientError('蒲公英返回的新版本数据不完整');
   }
 
   return {
-    buildHaveNewVersion: toBoolean(payload.buildHaveNewVersion),
+    buildHaveNewVersion: true,
     needForceUpdate: toBoolean(payload.needForceUpdate),
     downloadURL,
     buildVersion,

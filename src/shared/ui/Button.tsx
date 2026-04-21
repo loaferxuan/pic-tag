@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, Pressable } from 'react-native';
+import { Text, StyleSheet, ActivityIndicator, StyleProp, ViewStyle, TextStyle, Pressable } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import Colors from '@/shared/theme/Colors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -10,7 +10,7 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
   icon?: React.ReactNode;
 }
