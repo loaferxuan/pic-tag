@@ -15,3 +15,8 @@ jest.config.*
 .vscode/
 terminals/
 agent-transcripts/
+
+# CNG / 托管工作流：/android 与 /ios 由 EAS prebuild 动态生成
+# 本地无此目录、EAS 构建时才出现；忽略以保持指纹对称
+/android
+/ios

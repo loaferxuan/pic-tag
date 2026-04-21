@@ -4,5 +4,6 @@ module.exports = {
   sourceSkips:
     SourceSkips.ExpoConfigExtraSection |
     SourceSkips.ExpoConfigVersions |
-    SourceSkips.ExpoConfigRuntimeVersionIfString,
+    SourceSkips.ExpoConfigRuntimeVersionIfString |
+    SourceSkips.PackageJsonAndroidAndIosScriptsIfNotContainRun,
 };
