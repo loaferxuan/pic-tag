@@ -165,6 +165,18 @@ describe('native update service', () => {
     expect(getCredentials).not.toHaveBeenCalled();
   });
 
+  it('short-circuits to up_to_date in preview variant without calling network', async () => {
+    expoConstantsMock.default.expoConfig.extra = { appVariant: 'preview' };
+    const requestLatest = jest.fn(async () => buildData());
+    const getCredentials = jest.fn(() => ({ appKey: 'app-key', apiKey: 'api-key' }));
+    const service = createNativeUpdateService({ getCredentials, requestLatest });
+
+    await expect(service.checkOnStartup()).resolves.toEqual({ kind: 'up_to_date' });
+    await expect(service.checkManually()).resolves.toEqual({ kind: 'up_to_date' });
+    expect(requestLatest).not.toHaveBeenCalled();
+    expect(getCredentials).not.toHaveBeenCalled();
+  });
+
   it('dedupes same build on startup but not on manual check', async () => {
     const service = createNativeUpdateService(
       createMockDeps({

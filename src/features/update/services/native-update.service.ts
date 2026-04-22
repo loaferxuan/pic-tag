@@ -59,8 +59,9 @@ export function createNativeUpdateService(deps?: Partial<NativeUpdateServiceDeps
   let lastPromptedBuildKey: string | null = null;
 
   const checkCore = async (mode: 'startup' | 'manual'): Promise<NativeUpdateCheckResult> => {
-    // Dev 变体的 JS 始终来自 Metro，APK 升级链路不适用；直接短路，避免误拉 Release 的更新信息。
-    if (resolveAppVariant() === 'development') {
+    // Dev / Preview 变体与生产 APK 的包名/通道独立，弹升级到生产版对用户毫无意义；直接短路。
+    const variant = resolveAppVariant();
+    if (variant === 'development' || variant === 'preview') {
       return { kind: 'up_to_date' };
     }
 

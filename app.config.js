@@ -21,9 +21,20 @@ function resolveAndroidBuildArchs() {
 function resolveAppVariant() {
   const explicitVariant = process.env.APP_VARIANT;
   if (explicitVariant === 'development') return 'development';
+  if (explicitVariant === 'preview') return 'preview';
   if (explicitVariant === 'production') return 'production';
 
   return process.env.EAS_BUILD_PROFILE === 'development' ? 'development' : 'production';
+}
+
+function resolveVariantSuffixes(variant) {
+  if (variant === 'development') {
+    return { name: ' Dev', scheme: '-dev', id: '.dev' };
+  }
+  if (variant === 'preview') {
+    return { name: ' Preview', scheme: '-preview', id: '.preview' };
+  }
+  return { name: '', scheme: '', id: '' };
 }
 
 function withBuildPropertiesPlugin(plugins, androidBuildArchs, isDevelopment) {
@@ -75,22 +86,21 @@ function resolveGitCommitShort() {
 module.exports = () => {
   const variant = resolveAppVariant();
   const isDevelopment = variant === 'development';
+  const suffixes = resolveVariantSuffixes(variant);
   const androidBuildArchs = resolveAndroidBuildArchs();
   const gitCommitShort = resolveGitCommitShort();
 
   return {
     ...baseExpoConfig,
-    name: isDevelopment ? `${baseExpoConfig.name} Dev` : baseExpoConfig.name,
-    scheme: isDevelopment ? `${baseScheme}-dev` : baseScheme,
+    name: `${baseExpoConfig.name}${suffixes.name}`,
+    scheme: `${baseScheme}${suffixes.scheme}`,
     ios: {
       ...baseExpoConfig.ios,
-      bundleIdentifier: isDevelopment
-        ? `${baseIosBundleIdentifier}.dev`
-        : baseIosBundleIdentifier,
+      bundleIdentifier: `${baseIosBundleIdentifier}${suffixes.id}`,
     },
     android: {
       ...baseExpoConfig.android,
-      package: isDevelopment ? `${baseAndroidPackage}.dev` : baseAndroidPackage,
+      package: `${baseAndroidPackage}${suffixes.id}`,
     },
     extra: {
       ...baseExpoConfig.extra,
