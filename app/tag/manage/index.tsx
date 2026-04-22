@@ -185,7 +185,7 @@ export default function TagManageScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
-      bottomOffset={24}
+      bottomOffset={12}
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
 

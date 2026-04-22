@@ -769,7 +769,7 @@ export default function PhotoDetailScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        bottomOffset={24}
+        bottomOffset={12}
       >
       {shouldShowPhotoPlaceholder ? (
         <View style={styles.imagePlaceholder}>
@@ -1121,7 +1121,7 @@ export default function PhotoDetailScreen() {
           </View>
         </>
       ) : null}
-    </KeyboardAwareScrollView>
+      </KeyboardAwareScrollView>
     </>
   );
 }
