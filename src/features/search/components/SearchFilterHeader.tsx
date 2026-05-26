@@ -46,6 +46,10 @@ interface SearchFilterHeaderProps {
   selectedTagIds: number[];
   selectedTags: Tag[];
   onRemoveTag: (tagId: number) => void;
+  excludedTagIds: number[];
+  excludedTags: Tag[];
+  onRemoveExcludedTag: (tagId: number) => void;
+  onTagLongPress?: (tagId: number) => void;
   tagsError: string | null;
   tagsLoading: boolean;
   tags: Tag[];
@@ -129,6 +133,10 @@ export const SearchFilterHeader = memo(function SearchFilterHeader({
   selectedTagIds,
   selectedTags,
   onRemoveTag,
+  excludedTagIds,
+  excludedTags,
+  onRemoveExcludedTag,
+  onTagLongPress,
   tagsError,
   tagsLoading,
   tags,
@@ -449,17 +457,55 @@ export const SearchFilterHeader = memo(function SearchFilterHeader({
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.panelTitle, { color: colors.text }]}>已选标签（{selectedTagIds.length}）</Text>
-        {selectedTags.length === 0 ? (
+        <Text style={[styles.panelTitle, { color: colors.text }]}>
+          已选标签（包含 {selectedTagIds.length} · 排除 {excludedTagIds.length}）
+        </Text>
+        <Text style={[styles.usageHint, { color: colors.textSecondary }]}>
+          点击包含 · 再点切换排除 · 长按直接排除
+        </Text>
+
+        {selectedTags.length === 0 && excludedTags.length === 0 ? (
           <Text style={[styles.hint, { color: colors.textSecondary }]}>
-            {tagSelectionDisabled ? '已开启“仅未打标签”，当前不能同时按标签筛选。' : '未选择标签。你也可以仅按日期或状态筛选。'}
+            {tagSelectionDisabled
+              ? '已开启“仅未打标签”，当前不能同时按标签筛选。'
+              : '未选择标签。你也可以仅按日期或状态筛选。'}
           </Text>
         ) : (
-          <View style={styles.tagRow}>
-            {selectedTags.map((tag) => (
-              <TagBadge key={`selected-${tag.id}`} tag={tag} selected onPress={() => onRemoveTag(tag.id)} size="small" />
-            ))}
-          </View>
+          <>
+            {selectedTags.length > 0 ? (
+              <>
+                <Text style={[styles.subGroupLabel, { color: colors.textSecondary }]}>包含</Text>
+                <View style={styles.tagRow}>
+                  {selectedTags.map((tag) => (
+                    <TagBadge
+                      key={`selected-${tag.id}`}
+                      tag={tag}
+                      selected
+                      onPress={() => onRemoveTag(tag.id)}
+                      size="small"
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            {excludedTags.length > 0 ? (
+              <>
+                <Text style={[styles.subGroupLabel, { color: colors.textSecondary }]}>排除</Text>
+                <View style={styles.tagRow}>
+                  {excludedTags.map((tag) => (
+                    <TagBadge
+                      key={`excluded-${tag.id}`}
+                      tag={tag}
+                      excluded
+                      onPress={() => onRemoveExcludedTag(tag.id)}
+                      size="small"
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </>
         )}
       </View>
 
@@ -478,7 +524,9 @@ export const SearchFilterHeader = memo(function SearchFilterHeader({
             category={category}
             tags={groupTags}
             selectedTagIds={selectedTagIds}
+            excludedTagIds={excludedTagIds}
             onTagPress={onToggleTag}
+            onTagLongPress={onTagLongPress}
             tagsDisabled={tagSelectionDisabled}
             collapsible
             collapsed={collapsedCategories[category.id] ?? false}
@@ -498,7 +546,9 @@ export const SearchFilterHeader = memo(function SearchFilterHeader({
             }}
             tags={uncategorizedTags}
             selectedTagIds={selectedTagIds}
+            excludedTagIds={excludedTagIds}
             onTagPress={onToggleTag}
+            onTagLongPress={onTagLongPress}
             tagsDisabled={tagSelectionDisabled}
             collapsible
             collapsed={collapsedCategories[UNCATEGORIZED_TAG_CATEGORY_ID] ?? false}
@@ -642,6 +692,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 10,
+  },
+  usageHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  subGroupLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 6,
   },
   tagRow: {
     flexDirection: 'row',

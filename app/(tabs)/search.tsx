@@ -46,6 +46,7 @@ export default function SearchScreen() {
   } = useTagsWithCategories();
   const {
     selectedTagIds,
+    excludedTagIds,
     tagMatchMode,
     setTagMatchMode,
     onlyUntagged,
@@ -65,7 +66,9 @@ export default function SearchScreen() {
     hasMore,
     error,
     toggleTag,
+    excludeTag,
     removeTag,
+    removeExcludedTag,
     runSearch,
     resetSearch,
     loadMore,
@@ -87,6 +90,10 @@ export default function SearchScreen() {
   const selectedTags = useMemo(
     () => selectedTagIds.map((tagId) => tagMap.get(tagId)).filter(Boolean) as Tag[],
     [selectedTagIds, tagMap]
+  );
+  const excludedTags = useMemo(
+    () => excludedTagIds.map((tagId) => tagMap.get(tagId)).filter(Boolean) as Tag[],
+    [excludedTagIds, tagMap]
   );
   const categoryGroups = useMemo(() => {
     return categories
@@ -308,6 +315,10 @@ export default function SearchScreen() {
         selectedTagIds={selectedTagIds}
         selectedTags={selectedTags}
         onRemoveTag={removeTag}
+        excludedTagIds={excludedTagIds}
+        excludedTags={excludedTags}
+        onRemoveExcludedTag={removeExcludedTag}
+        onTagLongPress={excludeTag}
         tagsError={tagsError}
         tagsLoading={tagsLoading}
         tags={tags}
@@ -330,6 +341,9 @@ export default function SearchScreen() {
       dateFrom,
       dateTo,
       error,
+      excludeTag,
+      excludedTagIds,
+      excludedTags,
       fromLabel,
       handleDateChange,
       handleMissingCategoryPress,
@@ -345,6 +359,7 @@ export default function SearchScreen() {
       onlyUntagged,
       onlyUnresolvedAssociation,
       collapsedFilterPanels,
+      removeExcludedTag,
       removeTag,
       results.length,
       collapsedCategories,

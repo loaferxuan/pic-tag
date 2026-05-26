@@ -37,4 +37,57 @@ describe('buildSearchFilters', () => {
       onlyUnresolvedAssociation: true,
     });
   });
+
+  it('emits excludedTagIds when provided without included tags', () => {
+    const filters = buildSearchFilters({
+      selectedTagIds: [],
+      tagMatchMode: 'AND',
+      excludedTagIds: [6, 6, 7],
+      onlyUntagged: false,
+      missingCategoryId: null,
+      dateFrom: null,
+      dateTo: null,
+      onlyUnresolvedAssociation: false,
+    });
+
+    expect(filters).toEqual({
+      excludedTagIds: [6, 7],
+    });
+  });
+
+  it('drops excludedTagIds entries that overlap with selectedTagIds', () => {
+    const filters = buildSearchFilters({
+      selectedTagIds: [2, 5],
+      tagMatchMode: 'AND',
+      excludedTagIds: [5, 9],
+      onlyUntagged: false,
+      missingCategoryId: null,
+      dateFrom: null,
+      dateTo: null,
+      onlyUnresolvedAssociation: false,
+    });
+
+    expect(filters).toEqual({
+      tagIds: [2, 5],
+      tagMatchMode: 'AND',
+      excludedTagIds: [9],
+    });
+  });
+
+  it('omits excludedTagIds entirely when onlyUntagged is enabled', () => {
+    const filters = buildSearchFilters({
+      selectedTagIds: [],
+      tagMatchMode: 'AND',
+      excludedTagIds: [3, 4],
+      onlyUntagged: true,
+      missingCategoryId: null,
+      dateFrom: null,
+      dateTo: null,
+      onlyUnresolvedAssociation: false,
+    });
+
+    expect(filters).toEqual({
+      onlyUntagged: true,
+    });
+  });
 });

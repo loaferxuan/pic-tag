@@ -8,7 +8,9 @@ interface TagCategorySectionProps {
   category: TagCategory;
   tags: Tag[];
   selectedTagIds: number[];
+  excludedTagIds?: number[];
   onTagPress: (tagId: number) => void;
+  onTagLongPress?: (tagId: number) => void;
   tagsDisabled?: boolean;
   collapsible?: boolean;
   collapsed?: boolean;
@@ -19,7 +21,9 @@ export function TagCategorySection({
   category,
   tags,
   selectedTagIds,
+  excludedTagIds,
   onTagPress,
+  onTagLongPress,
   tagsDisabled = false,
   collapsible = false,
   collapsed = false,
@@ -68,7 +72,9 @@ export function TagCategorySection({
               key={tag.id}
               tag={tag}
               selected={selectedTagIds.includes(tag.id)}
+              excluded={excludedTagIds?.includes(tag.id) ?? false}
               onPress={() => onTagPress(tag.id)}
+              onLongPress={onTagLongPress ? () => onTagLongPress(tag.id) : undefined}
               size="small"
               disabled={tagsDisabled}
             />

@@ -114,6 +114,7 @@ type FingerprintStatePatch = Partial<{
 type PhotoFilters = {
   tagIds?: number[];
   tagMatchMode?: 'AND' | 'OR';
+  excludedTagIds?: number[];
   onlyUntagged?: boolean;
   missingCategoryId?: number;
   dateFrom?: string;
@@ -219,6 +220,19 @@ export class PhotoRepository {
           WHERE pt.photo_id = photos.id
         )`
       );
+    }
+
+    const normalizedExcludedTagIds = normalizeTagIds(filters.excludedTagIds ?? []);
+    if (normalizedExcludedTagIds.length > 0) {
+      conditions.push(
+        `NOT EXISTS (
+          SELECT 1
+          FROM photo_tags pt
+          WHERE pt.photo_id = photos.id
+            AND pt.tag_id IN (${normalizedExcludedTagIds.map(() => '?').join(',')})
+        )`
+      );
+      params.push(...normalizedExcludedTagIds);
     }
 
     if (

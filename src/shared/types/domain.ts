@@ -57,6 +57,7 @@ export interface Tag {
 export interface SearchFilters {
   tagIds?: number[];
   tagMatchMode?: 'AND' | 'OR';
+  excludedTagIds?: number[];
   onlyUntagged?: boolean;
   missingCategoryId?: number;
   dateFrom?: string;

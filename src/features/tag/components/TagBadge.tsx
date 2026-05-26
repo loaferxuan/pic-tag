@@ -8,7 +8,9 @@ import Colors from '@/shared/theme/Colors';
 interface TagBadgeProps {
   tag: Tag;
   onPress?: () => void;
+  onLongPress?: () => void;
   selected?: boolean;
+  excluded?: boolean;
   size?: 'small' | 'medium';
   disabled?: boolean;
 }
@@ -17,11 +19,15 @@ const DEFAULT_UNSELECTED_BG_ALPHA = 0.12;
 const DEFAULT_UNSELECTED_BORDER_ALPHA = 0.2;
 const LIGHT_UNSELECTED_BG_ALPHA = 0.15;
 const LIGHT_BORDER_COLOR = 'rgba(15,23,42,0.15)';
+const EXCLUDED_COLOR = '#ef4444';
+const EXCLUDED_BG = 'rgba(239,68,68,0.12)';
 
 export function TagBadge({
   tag,
   onPress,
+  onLongPress,
   selected = false,
+  excluded = false,
   size = 'medium',
   disabled = false,
 }: TagBadgeProps) {
@@ -32,18 +38,32 @@ export function TagBadge({
   const contrastTextColor = getContrastTextColor(color);
   const isLightColor = contrastTextColor === '#111827';
 
-  let backgroundColor = selected ? color : hexToRgba(color, DEFAULT_UNSELECTED_BG_ALPHA);
-  let borderColor = selected ? themeColors.text : hexToRgba(color, DEFAULT_UNSELECTED_BORDER_ALPHA);
-  let textColor = selected ? contrastTextColor : color;
+  const effectiveSelected = excluded ? false : selected;
+
+  let backgroundColor = effectiveSelected ? color : hexToRgba(color, DEFAULT_UNSELECTED_BG_ALPHA);
+  let borderColor = effectiveSelected
+    ? themeColors.text
+    : hexToRgba(color, DEFAULT_UNSELECTED_BORDER_ALPHA);
+  let textColor = effectiveSelected ? contrastTextColor : color;
+  let borderWidth = effectiveSelected ? 2 : 1;
+  let fontWeight: '700' | '600' = effectiveSelected ? '700' : '600';
 
   if (isLightColor) {
-    if (selected) {
+    if (effectiveSelected) {
       textColor = '#111827';
     } else {
       backgroundColor = hexToRgba(color, LIGHT_UNSELECTED_BG_ALPHA);
       borderColor = LIGHT_BORDER_COLOR;
       textColor = '#1f2937';
     }
+  }
+
+  if (excluded) {
+    backgroundColor = EXCLUDED_BG;
+    borderColor = EXCLUDED_COLOR;
+    textColor = EXCLUDED_COLOR;
+    borderWidth = 2;
+    fontWeight = '700';
   }
 
   const content = (
@@ -54,7 +74,7 @@ export function TagBadge({
         {
           backgroundColor,
           borderColor,
-          borderWidth: selected ? 2 : 1,
+          borderWidth,
           opacity: disabled ? 0.45 : 1,
         },
       ]}
@@ -65,8 +85,9 @@ export function TagBadge({
           size === 'small' && styles.textSmall,
           {
             color: textColor,
-            fontWeight: selected ? '700' : '600',
+            fontWeight,
           },
+          excluded && styles.textExcluded,
         ]}
         numberOfLines={1}
       >
@@ -74,9 +95,14 @@ export function TagBadge({
       </Text>
     </View>
   );
-  if (onPress) {
+  if (onPress || onLongPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={disabled ? 1 : 0.7} disabled={disabled}>
+      <TouchableOpacity
+        onPress={onPress}
+        onLongPress={onLongPress}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
+      >
         {content}
       </TouchableOpacity>
     );
@@ -106,5 +132,8 @@ const styles = StyleSheet.create({
   textSmall: {
     fontSize: 12,
     letterSpacing: 0.1,
+  },
+  textExcluded: {
+    textDecorationLine: 'line-through',
   },
 });

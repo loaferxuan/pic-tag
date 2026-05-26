@@ -26,6 +26,7 @@ function dedupePhotosById(photos: Photo[]): Photo[] {
 export function buildSearchFilters(params: {
   selectedTagIds: number[];
   tagMatchMode: 'AND' | 'OR';
+  excludedTagIds?: number[];
   onlyUntagged: boolean;
   missingCategoryId: number | null;
   dateFrom: Date | null;
@@ -33,13 +34,21 @@ export function buildSearchFilters(params: {
   onlyUnresolvedAssociation: boolean;
 }): SearchFilters {
   const normalizedTagIds = normalizeTagIds(params.selectedTagIds);
+  const normalizedExcludedTagIds = normalizeTagIds(params.excludedTagIds ?? []);
+  const includedSet = new Set(normalizedTagIds);
+  const disjointExcludedTagIds = normalizedExcludedTagIds.filter((id) => !includedSet.has(id));
   const filters: SearchFilters = {};
 
   if (params.onlyUntagged) {
     filters.onlyUntagged = true;
-  } else if (normalizedTagIds.length > 0) {
-    filters.tagIds = normalizedTagIds;
-    filters.tagMatchMode = params.tagMatchMode;
+  } else {
+    if (normalizedTagIds.length > 0) {
+      filters.tagIds = normalizedTagIds;
+      filters.tagMatchMode = params.tagMatchMode;
+    }
+    if (disjointExcludedTagIds.length > 0) {
+      filters.excludedTagIds = disjointExcludedTagIds;
+    }
   }
   if (params.missingCategoryId != null && Number.isInteger(params.missingCategoryId) && params.missingCategoryId > 0) {
     filters.missingCategoryId = params.missingCategoryId;
@@ -58,6 +67,7 @@ export function buildSearchFilters(params: {
 
 export function useSearch() {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [excludedTagIds, setExcludedTagIds] = useState<number[]>([]);
   const [tagMatchMode, setTagMatchMode] = useState<'AND' | 'OR'>('AND');
   const [onlyUntagged, setOnlyUntagged] = useState(false);
   const [missingCategoryId, setMissingCategoryId] = useState<number | null>(null);
@@ -106,6 +116,7 @@ export function useSearch() {
     const filters = buildSearchFilters({
       selectedTagIds,
       tagMatchMode,
+      excludedTagIds,
       onlyUntagged,
       missingCategoryId,
       dateFrom,
@@ -117,6 +128,7 @@ export function useSearch() {
   }, [
     dateFrom,
     dateTo,
+    excludedTagIds,
     executeSearch,
     missingCategoryId,
     onlyUntagged,
@@ -127,6 +139,7 @@ export function useSearch() {
 
   const resetSearch = useCallback(async () => {
     setSelectedTagIds([]);
+    setExcludedTagIds([]);
     setTagMatchMode('AND');
     setOnlyUntagged(false);
     setMissingCategoryId(null);
@@ -138,6 +151,7 @@ export function useSearch() {
 
   const applyUnresolvedAssociationPreset = useCallback(async () => {
     setSelectedTagIds([]);
+    setExcludedTagIds([]);
     setTagMatchMode('AND');
     setOnlyUntagged(false);
     setMissingCategoryId(null);
@@ -149,6 +163,7 @@ export function useSearch() {
 
   const applyUntaggedPreset = useCallback(async () => {
     setSelectedTagIds([]);
+    setExcludedTagIds([]);
     setTagMatchMode('AND');
     setOnlyUntagged(true);
     setMissingCategoryId(null);
@@ -163,6 +178,7 @@ export function useSearch() {
     const filters = buildSearchFilters({
       selectedTagIds,
       tagMatchMode,
+      excludedTagIds,
       onlyUntagged,
       missingCategoryId,
       dateFrom,
@@ -170,7 +186,16 @@ export function useSearch() {
       onlyUnresolvedAssociation: false,
     });
     await executeSearch(filters);
-  }, [dateFrom, dateTo, executeSearch, missingCategoryId, onlyUntagged, selectedTagIds, tagMatchMode]);
+  }, [
+    dateFrom,
+    dateTo,
+    excludedTagIds,
+    executeSearch,
+    missingCategoryId,
+    onlyUntagged,
+    selectedTagIds,
+    tagMatchMode,
+  ]);
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore) return;
@@ -196,12 +221,24 @@ export function useSearch() {
 
   const toggleTag = useCallback((tagId: number) => {
     if (onlyUntagged) return;
-    setSelectedTagIds((prev) => {
-      if (prev.includes(tagId)) {
-        return prev.filter((id) => id !== tagId);
-      }
-      return [...prev, tagId];
-    });
+    const inIncluded = selectedTagIds.includes(tagId);
+    const inExcluded = excludedTagIds.includes(tagId);
+    if (!inIncluded && !inExcluded) {
+      setSelectedTagIds((prev) => (prev.includes(tagId) ? prev : [...prev, tagId]));
+      return;
+    }
+    if (inIncluded) {
+      setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+      setExcludedTagIds((prev) => (prev.includes(tagId) ? prev : [...prev, tagId]));
+      return;
+    }
+    setExcludedTagIds((prev) => prev.filter((id) => id !== tagId));
+  }, [excludedTagIds, onlyUntagged, selectedTagIds]);
+
+  const excludeTag = useCallback((tagId: number) => {
+    if (onlyUntagged) return;
+    setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+    setExcludedTagIds((prev) => (prev.includes(tagId) ? prev : [...prev, tagId]));
   }, [onlyUntagged]);
 
   const removeTag = useCallback((tagId: number) => {
@@ -209,10 +246,16 @@ export function useSearch() {
     setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
   }, [onlyUntagged]);
 
+  const removeExcludedTag = useCallback((tagId: number) => {
+    if (onlyUntagged) return;
+    setExcludedTagIds((prev) => prev.filter((id) => id !== tagId));
+  }, [onlyUntagged]);
+
   const handleOnlyUntaggedChange = useCallback((value: boolean) => {
     setOnlyUntagged(value);
     if (value) {
       setSelectedTagIds([]);
+      setExcludedTagIds([]);
     }
   }, []);
 
@@ -222,6 +265,7 @@ export function useSearch() {
 
   return {
     selectedTagIds,
+    excludedTagIds,
     tagMatchMode,
     setTagMatchMode,
     onlyUntagged,
@@ -241,7 +285,9 @@ export function useSearch() {
     hasMore,
     error,
     toggleTag,
+    excludeTag,
     removeTag,
+    removeExcludedTag,
     runSearch,
     resetSearch,
     loadMore,
